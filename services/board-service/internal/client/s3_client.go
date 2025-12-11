@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -97,37 +98,45 @@ func NewS3Client(cfg *appConfig.S3Config) (*S3Client, error) {
 	})
 
 	// Create separate presign client with public endpoint for browser-accessible URLs
-	// Validate required configuration
-	if cfg.PublicEndpoint == "" {
-		return nil, fmt.Errorf("S3_PUBLIC_ENDPOINT is required for presigned URLs (check environment variables)")
-	}
-	if cfg.Endpoint == "" {
-		return nil, fmt.Errorf("S3_ENDPOINT is required for internal S3 operations")
+	var presignClient *s3.Client
+	if cfg.PublicEndpoint != "" && cfg.Endpoint != "" {
+		publicAwsCfg, err := config.LoadDefaultConfig(ctx,
+			config.WithRegion(cfg.Region),
+			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				cfg.AccessKey,
+				cfg.SecretKey,
+				"",
+			)),
+			config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					return aws.Endpoint{
+						URL:               cfg.PublicEndpoint,
+						HostnameImmutable: true,
+						SigningRegion:     cfg.Region,
+					}, nil
+				},
+			)),
+		)
+		if err != nil {
+			// Log warning but don't fail - fallback to regular client
+			fmt.Fprintf(os.Stderr, "WARNING: Failed to load public AWS config: %v. Using internal endpoint for presigned URLs.\n", err)
+			presignClient = client
+		} else {
+			presignClient = s3.NewFromConfig(publicAwsCfg, func(o *s3.Options) {
+				o.UsePathStyle = true
+			})
+		}
+	} else {
+		// Log warning about missing configuration
+		if cfg.PublicEndpoint == "" {
+			fmt.Fprintf(os.Stderr, "WARNING: S3_PUBLIC_ENDPOINT not set. Presigned URLs will use internal endpoint.\n")
+		}
+		presignClient = client
 	}
 
-	publicAwsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(cfg.Region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			cfg.AccessKey,
-			cfg.SecretKey,
-			"",
-		)),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{
-					URL:               cfg.PublicEndpoint,
-					HostnameImmutable: true,
-					SigningRegion:     cfg.Region,
-				}, nil
-			},
-		)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load public AWS config: %w", err)
-	}
-	presignClient := s3.NewFromConfig(publicAwsCfg, func(o *s3.Options) {
-		o.UsePathStyle = true
-	})
+	// Log the endpoints being used
+	fmt.Fprintf(os.Stderr, "INFO: S3Client initialized - Bucket: %s, Endpoint: %s, PublicEndpoint: %s\n",
+		cfg.Bucket, cfg.Endpoint, cfg.PublicEndpoint)
 
 	return &S3Client{
 		client:         client,
