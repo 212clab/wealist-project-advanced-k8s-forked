@@ -258,6 +258,17 @@ func (c *Config) validate() error {
 	if c.JWT.Secret == "" {
 		return fmt.Errorf("jwt secret is required")
 	}
+
+	// S3 configuration validation
+	if c.S3.Bucket != "" {
+		if c.S3.Endpoint == "" {
+			return fmt.Errorf("S3_ENDPOINT is required when S3 is configured")
+		}
+		if c.S3.PublicEndpoint == "" {
+			return fmt.Errorf("S3_PUBLIC_ENDPOINT is required for presigned URLs")
+		}
+	}
+
 	return nil
 }
 

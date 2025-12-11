@@ -74,34 +74,37 @@ func NewS3Client(cfg *internalConfig.S3Config) (*S3Client, error) {
 
 	// Create separate presign client with public endpoint for browser-accessible URLs
 	// This ensures presigned URLs are signed with the correct host that browsers will use
-	var presignClient *s3.Client
-	if cfg.PublicEndpoint != "" && cfg.Endpoint != "" {
-		publicAwsCfg, err := config.LoadDefaultConfig(ctx,
-			config.WithRegion(cfg.Region),
-			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-				cfg.AccessKey,
-				cfg.SecretKey,
-				"",
-			)),
-			config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-					return aws.Endpoint{
-						URL:               cfg.PublicEndpoint,
-						HostnameImmutable: true,
-						SigningRegion:     cfg.Region,
-					}, nil
-				},
-			)),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load public AWS config: %w", err)
-		}
-		presignClient = s3.NewFromConfig(publicAwsCfg, func(o *s3.Options) {
-			o.UsePathStyle = true
-		})
-	} else {
-		presignClient = client
+	// Validate required configuration
+	if cfg.PublicEndpoint == "" {
+		return nil, fmt.Errorf("S3_PUBLIC_ENDPOINT is required for presigned URLs (check environment variables)")
 	}
+	if cfg.Endpoint == "" {
+		return nil, fmt.Errorf("S3_ENDPOINT is required for internal S3 operations")
+	}
+
+	publicAwsCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(cfg.Region),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			cfg.AccessKey,
+			cfg.SecretKey,
+			"",
+		)),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{
+					URL:               cfg.PublicEndpoint,
+					HostnameImmutable: true,
+					SigningRegion:     cfg.Region,
+				}, nil
+			},
+		)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load public AWS config: %w", err)
+	}
+	presignClient := s3.NewFromConfig(publicAwsCfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
 
 	return &S3Client{
 		client:         client,

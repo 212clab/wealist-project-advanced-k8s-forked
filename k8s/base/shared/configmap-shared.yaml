@@ -55,7 +55,7 @@ data:
 
   # MinIO (S3 호환)
   S3_ENDPOINT: "http://minio:9000"
-  S3_PUBLIC_ENDPOINT: "http://localhost:9000"  # 브라우저 접근용 (overlay에서 환경별로 오버라이드)
+  S3_PUBLIC_ENDPOINT: "http://minio:9000"  # 기본값 (overlay에서 반드시 오버라이드 필요)
   S3_BUCKET: "wealist-files"
   S3_REGION: "ap-northeast-2"
 
