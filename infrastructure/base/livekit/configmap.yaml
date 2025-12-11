@@ -24,6 +24,6 @@ data:
 
     turn:
       enabled: true
-      domain: localhost
+      domain: local.wealist.co.kr
       tls_port: 0
       udp_port: 3478
