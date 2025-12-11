@@ -209,6 +209,7 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
 
     const connect = async () => {
       try {
+        console.log('[VideoRoom] Connecting with WS URL:', wsUrl, 'Token:', token?.slice(0, 10) + '...');
         await room.connect(wsUrl, token);
         setConnectionState('connected');
         updateParticipants();
@@ -623,10 +624,10 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
               <GripHorizontal className="w-4 h-4 text-gray-500" />
               <div
                 className={`w-2 h-2 rounded-full ${connectionState === 'connected'
-                    ? 'bg-green-500'
-                    : connectionState === 'connecting'
-                      ? 'bg-yellow-500 animate-pulse'
-                      : 'bg-red-500'
+                  ? 'bg-green-500'
+                  : connectionState === 'connecting'
+                    ? 'bg-yellow-500 animate-pulse'
+                    : 'bg-red-500'
                   }`}
               />
               <span className="text-white text-sm font-medium truncate flex-1">{roomInfo.name}</span>
@@ -663,8 +664,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
             <button
               onClick={toggleMute}
               className={`p-2 rounded-full transition ${isMuted
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
                 }`}
             >
               {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -673,8 +674,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
             <button
               onClick={toggleVideo}
               className={`p-2 rounded-full transition ${!isVideoEnabled
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
                 }`}
             >
               {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
@@ -709,10 +710,10 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
         <div className="flex items-center gap-3">
           <div
             className={`w-3 h-3 rounded-full ${connectionState === 'connected'
-                ? 'bg-green-500'
-                : connectionState === 'connecting'
-                  ? 'bg-yellow-500 animate-pulse'
-                  : 'bg-red-500'
+              ? 'bg-green-500'
+              : connectionState === 'connecting'
+                ? 'bg-yellow-500 animate-pulse'
+                : 'bg-red-500'
               }`}
           />
           <h1 className="text-white font-medium">{roomInfo.name}</h1>
@@ -736,8 +737,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={() => setShowParticipants(!showParticipants)}
             className={`p-2 rounded-lg transition ${showParticipants
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
           >
             <Users className="w-5 h-5" />
@@ -851,8 +852,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
                       </div>
                       <div
                         className={`px-3 py-2 rounded-lg text-sm max-w-[85%] break-words ${msg.isLocal
-                            ? 'bg-blue-600 text-white rounded-br-none'
-                            : 'bg-gray-700 text-gray-100 rounded-bl-none'
+                          ? 'bg-blue-600 text-white rounded-br-none'
+                          : 'bg-gray-700 text-gray-100 rounded-bl-none'
                           }`}
                       >
                         {msg.message}
@@ -909,8 +910,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={toggleMute}
             className={`p-3 rounded-full transition duration-200 transform hover:scale-105 ${isMuted
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
             title={isMuted ? '마이크 켜기' : '마이크 끄기'}
           >
@@ -920,8 +921,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={toggleVideo}
             className={`p-3 rounded-full transition duration-200 transform hover:scale-105 ${!isVideoEnabled
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
             title={isVideoEnabled ? '카메라 끄기' : '카메라 켜기'}
           >
@@ -931,8 +932,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={toggleScreenShare}
             className={`p-3 rounded-full transition duration-200 transform hover:scale-105 ${isScreenSharing
-                ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
             title="화면 공유"
           >
@@ -942,8 +943,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={toggleSubtitle}
             className={`p-3 rounded-full transition duration-200 transform hover:scale-105 ${isSubtitleEnabled
-                ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-lg shadow-purple-500/20'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
             title="자막"
           >
@@ -953,8 +954,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={() => setIsMirrored(!isMirrored)}
             className={`p-3 rounded-full transition duration-200 transform hover:scale-105 ${isMirrored
-                ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+              : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
             title="좌우 반전"
           >

@@ -49,6 +49,7 @@ func main() {
 		zap.String("env", cfg.Server.Env),
 		zap.Int("port", cfg.Server.Port),
 		zap.String("basePath", cfg.Server.BasePath),
+		zap.String("liveKitWSUrl", cfg.LiveKit.WSUrl), // Log the WSUrl
 	)
 
 	// Initialize database
