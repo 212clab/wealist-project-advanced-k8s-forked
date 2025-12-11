@@ -135,3 +135,12 @@ patches:
       - op: replace
         path: /data/S3_PUBLIC_ENDPOINT
         value: "https://local.wealist.co.kr/minio"
+
+  # Shared config: S3_PUBLIC_ENDPOINT for local.wealist.co.kr domain
+  - target:
+      kind: ConfigMap
+      name: wealist-shared-config
+    patch: |-
+      - op: replace
+        path: /data/S3_PUBLIC_ENDPOINT
+        value: "https://local.wealist.co.kr/minio"

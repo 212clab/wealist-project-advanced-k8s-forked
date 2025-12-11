@@ -22,6 +22,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: wealist-shared-config
+            - configMapRef:
+                name: board-service-config
             - secretRef:
                 name: wealist-shared-secrets
           env:
