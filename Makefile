@@ -199,10 +199,15 @@ board-service-all: board-service-load board-service-redeploy
 
 # --- chat-service ---
 chat-service-build:
-	$(call build-service,chat-service,services/chat-service,docker/Dockerfile)
+	@echo "Building chat-service..."
+	docker build -t $(LOCAL_REGISTRY)/chat-service:$(IMAGE_TAG) -f services/chat-service/docker/Dockerfile .
+	@echo "✅ Built $(LOCAL_REGISTRY)/chat-service:$(IMAGE_TAG)"
 
 chat-service-load:
-	$(call load-service,chat-service,services/chat-service,docker/Dockerfile)
+	@echo "Building and pushing chat-service to registry..."
+	docker build -t $(LOCAL_REGISTRY)/chat-service:$(IMAGE_TAG) -f services/chat-service/docker/Dockerfile .
+	docker push $(LOCAL_REGISTRY)/chat-service:$(IMAGE_TAG)
+	@echo "✅ Pushed $(LOCAL_REGISTRY)/chat-service:$(IMAGE_TAG)"
 
 chat-service-redeploy:
 	$(call redeploy-service,chat-service)
@@ -247,10 +252,15 @@ storage-service-all: storage-service-load storage-service-redeploy
 
 # --- user-service ---
 user-service-build:
-	$(call build-service,user-service,services/user-service,docker/Dockerfile)
+	@echo "Building user-service..."
+	docker build -t $(LOCAL_REGISTRY)/user-service:$(IMAGE_TAG) -f services/user-service/docker/Dockerfile .
+	@echo "✅ Built $(LOCAL_REGISTRY)/user-service:$(IMAGE_TAG)"
 
 user-service-load:
-	$(call load-service,user-service,services/user-service,docker/Dockerfile)
+	@echo "Building and pushing user-service to registry..."
+	docker build -t $(LOCAL_REGISTRY)/user-service:$(IMAGE_TAG) -f services/user-service/docker/Dockerfile .
+	docker push $(LOCAL_REGISTRY)/user-service:$(IMAGE_TAG)
+	@echo "✅ Pushed $(LOCAL_REGISTRY)/user-service:$(IMAGE_TAG)"
 
 user-service-redeploy:
 	$(call redeploy-service,user-service)

@@ -5,18 +5,25 @@ FROM golang:1.24-bookworm AS builder
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Set working directory to project root
+WORKDIR /workspace
 
-# Copy go mod files first (for layer caching)
-COPY go.mod go.sum ./
+# Copy go workspace file
+COPY go.work go.work.sum* ./
+
+# Copy shared package
+COPY packages/wealist-advanced-go-pkg/ ./packages/wealist-advanced-go-pkg/
+
+# Copy service go.mod files first (for layer caching)
+COPY services/user-service/go.mod services/user-service/go.sum ./services/user-service/
 
 # Download dependencies with cache mount (cached between builds)
+WORKDIR /workspace/services/user-service
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy source code
-COPY . .
+# Copy service source code
+COPY services/user-service/ ./
 
 # Build with cache mount (dramatically speeds up incremental builds)
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -37,10 +44,10 @@ RUN addgroup -g 1000 appuser && \
 WORKDIR /home/appuser
 
 # Copy binary from builder
-COPY --from=builder --chown=appuser:appuser /app/user-api .
+COPY --from=builder --chown=appuser:appuser /workspace/services/user-service/user-api .
 
 # Copy configuration files
-COPY --from=builder --chown=appuser:appuser /app/configs ./configs
+COPY --from=builder --chown=appuser:appuser /workspace/services/user-service/configs ./configs
 
 # Switch to non-root user
 USER appuser
