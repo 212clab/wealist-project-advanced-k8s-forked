@@ -123,6 +123,17 @@ spec:
                   number: 7880
 
           # ============================================
+          # MinIO Proxy (S3 Presigned URL 접근용)
+          # ============================================
+          - path: /minio(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000
+
+          # ============================================
           # Frontend (catch-all, 맨 마지막)
           # ============================================
           - path: /()(.*)

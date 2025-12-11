@@ -108,3 +108,12 @@ patches:
       - op: add
         path: /data/SERVER_BASE_PATH
         value: "/api"
+
+  # Storage service: S3_PUBLIC_ENDPOINT for local.wealist.co.kr domain
+  - target:
+      kind: ConfigMap
+      name: storage-service-config
+    patch: |-
+      - op: replace
+        path: /data/S3_PUBLIC_ENDPOINT
+        value: "https://local.wealist.co.kr/minio"

@@ -76,3 +76,11 @@ spec:
                 name: video-service
                 port:
                   number: 8004
+          # MinIO Proxy (S3 Presigned URL 접근용)
+          - path: /minio(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000
