@@ -82,27 +82,6 @@ patches:
         path: /data/OAUTH2_CLIENT_REDIRECT_URI
         value: "http://local.wealist.co.kr/login/oauth2/code/google"
 
-  # Board service: Add SERVER_BASE_PATH for ingress routing
-  - target:
-      kind: ConfigMap
-      name: board-service-config
-    patch: |-
-      - op: add
-        path: /data/SERVER_BASE_PATH
-        value: "/api/boards"
-
-  # Board service: Update health check paths to match SERVER_BASE_PATH
-  - target:
-      kind: Deployment
-      name: board-service
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/livenessProbe/httpGet/path
-        value: "/api/boards/health/live"
-      - op: replace
-        path: /spec/template/spec/containers/0/readinessProbe/httpGet/path
-        value: "/api/boards/health/ready"
-
   # Chat service: Add SERVER_BASE_PATH for ingress routing
   - target:
       kind: ConfigMap
