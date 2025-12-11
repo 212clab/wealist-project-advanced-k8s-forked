@@ -12,13 +12,15 @@ import (
 
 // FileHandler handles file HTTP requests
 type FileHandler struct {
-	fileService *service.FileService
+	fileService   *service.FileService
+	accessService service.AccessService
 }
 
 // NewFileHandler creates a new FileHandler
-func NewFileHandler(fileService *service.FileService) *FileHandler {
+func NewFileHandler(fileService *service.FileService, accessService service.AccessService) *FileHandler {
 	return &FileHandler{
-		fileService: fileService,
+		fileService:   fileService,
+		accessService: accessService,
 	}
 }
 
@@ -41,10 +43,21 @@ func (h *FileHandler) GenerateUploadURL(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	var req domain.GenerateUploadURLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handleBadRequest(c, "Invalid request body: "+err.Error())
 		return
+	}
+
+	// Validate access (workspace + optional project)
+	if h.accessService != nil {
+		requiredPerm := domain.ProjectPermissionEditor // Need editor permission to upload
+		if err := h.accessService.ValidateResourceAccess(c.Request.Context(), req.WorkspaceID, req.ProjectID, userID, token, requiredPerm); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	response, err := h.fileService.GenerateUploadURL(c.Request.Context(), req, userID)
@@ -101,6 +114,14 @@ func (h *FileHandler) ConfirmUpload(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/files/{fileId} [get]
 func (h *FileHandler) GetFile(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	fileIDStr := c.Param("fileId")
 	fileID, err := parseUUID(fileIDStr)
 	if err != nil {
@@ -112,6 +133,14 @@ func (h *FileHandler) GetFile(c *gin.Context) {
 	if err != nil {
 		handleNotFound(c, err.Error())
 		return
+	}
+
+	// Validate access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFileAccess(c.Request.Context(), fileID, userID, token, domain.ProjectPermissionViewer); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	respondWithData(c, http.StatusOK, file.ToResponse(h.fileService.GetFileURL(file.FileKey)))
@@ -130,11 +159,27 @@ func (h *FileHandler) GetFile(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/workspaces/{workspaceId}/files [get]
 func (h *FileHandler) GetWorkspaceFiles(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	workspaceIDStr := c.Param("workspaceId")
 	workspaceID, err := parseUUID(workspaceIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid workspace ID")
 		return
+	}
+
+	// Validate workspace access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateWorkspaceAccess(c.Request.Context(), workspaceID, userID, token); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -169,11 +214,21 @@ func (h *FileHandler) UpdateFile(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	fileIDStr := c.Param("fileId")
 	fileID, err := parseUUID(fileIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid file ID")
 		return
+	}
+
+	// Validate access (need editor permission to update)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFileAccess(c.Request.Context(), fileID, userID, token, domain.ProjectPermissionEditor); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	var req domain.UpdateFileRequest
@@ -209,11 +264,21 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	fileIDStr := c.Param("fileId")
 	fileID, err := parseUUID(fileIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid file ID")
 		return
+	}
+
+	// Validate access (need editor permission to delete)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFileAccess(c.Request.Context(), fileID, userID, token, domain.ProjectPermissionEditor); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	if err := h.fileService.DeleteFile(c.Request.Context(), fileID, userID); err != nil {
@@ -336,11 +401,27 @@ func (h *FileHandler) GetTrashFiles(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/workspaces/{workspaceId}/files/search [get]
 func (h *FileHandler) SearchFiles(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	workspaceIDStr := c.Param("workspaceId")
 	workspaceID, err := parseUUID(workspaceIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid workspace ID")
 		return
+	}
+
+	// Validate workspace access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateWorkspaceAccess(c.Request.Context(), workspaceID, userID, token); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	query := c.Query("q")
@@ -372,11 +453,27 @@ func (h *FileHandler) SearchFiles(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/workspaces/{workspaceId}/usage [get]
 func (h *FileHandler) GetStorageUsage(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	workspaceIDStr := c.Param("workspaceId")
 	workspaceID, err := parseUUID(workspaceIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid workspace ID")
 		return
+	}
+
+	// Validate workspace access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateWorkspaceAccess(c.Request.Context(), workspaceID, userID, token); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	totalSize, fileCount, err := h.fileService.GetStorageUsage(c.Request.Context(), workspaceID)
@@ -406,11 +503,27 @@ func (h *FileHandler) GetStorageUsage(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/files/{fileId}/download [get]
 func (h *FileHandler) GetDownloadURL(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	fileIDStr := c.Param("fileId")
 	fileID, err := parseUUID(fileIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid file ID")
 		return
+	}
+
+	// Validate access (need viewer permission to download)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFileAccess(c.Request.Context(), fileID, userID, token, domain.ProjectPermissionViewer); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	url, err := h.fileService.GenerateDownloadURL(c.Request.Context(), fileID)

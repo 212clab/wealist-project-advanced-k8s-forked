@@ -78,6 +78,7 @@ func (s *FolderService) CreateFolder(ctx context.Context, req domain.CreateFolde
 	folder := &domain.Folder{
 		ID:          uuid.New(),
 		WorkspaceID: req.WorkspaceID,
+		ProjectID:   req.ProjectID,
 		ParentID:    req.ParentID,
 		Name:        uniqueName,
 		Path:        path,

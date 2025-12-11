@@ -10,7 +10,8 @@ import (
 type Folder struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	WorkspaceID uuid.UUID  `gorm:"type:uuid;not null;index" json:"workspaceId"`
-	ParentID    *uuid.UUID `gorm:"type:uuid;index" json:"parentId,omitempty"` // nil means root folder
+	ProjectID   *uuid.UUID `gorm:"type:uuid;index" json:"projectId,omitempty"` // nil means workspace-level (no project)
+	ParentID    *uuid.UUID `gorm:"type:uuid;index" json:"parentId,omitempty"`  // nil means root folder
 	Name        string     `gorm:"size:255;not null" json:"name"`
 	Path        string     `gorm:"size:2048;not null;index" json:"path"` // Full path like /documents/projects
 	Color       *string    `gorm:"size:7" json:"color,omitempty"`        // Hex color code like #FF5733
@@ -20,6 +21,7 @@ type Folder struct {
 	DeletedAt   *time.Time `gorm:"index" json:"deletedAt,omitempty"` // Soft delete for trash
 
 	// Relations (not stored in DB, populated via JOIN)
+	Project  *Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	Parent   *Folder  `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
 	Children []Folder `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 	Files    []File   `gorm:"foreignKey:FolderID" json:"files,omitempty"`
@@ -43,6 +45,7 @@ func (f *Folder) IsDeleted() bool {
 // CreateFolderRequest represents request for creating a new folder
 type CreateFolderRequest struct {
 	WorkspaceID uuid.UUID  `json:"workspaceId" binding:"required"`
+	ProjectID   *uuid.UUID `json:"projectId,omitempty"`
 	ParentID    *uuid.UUID `json:"parentId,omitempty"`
 	Name        string     `json:"name" binding:"required,min=1,max=255"`
 	Color       *string    `json:"color,omitempty"`
@@ -57,21 +60,22 @@ type UpdateFolderRequest struct {
 
 // FolderResponse represents folder data returned to client
 type FolderResponse struct {
-	ID          uuid.UUID         `json:"id"`
-	WorkspaceID uuid.UUID         `json:"workspaceId"`
-	ParentID    *uuid.UUID        `json:"parentId,omitempty"`
-	Name        string            `json:"name"`
-	Path        string            `json:"path"`
-	Color       *string           `json:"color,omitempty"`
-	CreatedBy   uuid.UUID         `json:"createdBy"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
-	IsDeleted   bool              `json:"isDeleted"`
-	Children    []FolderResponse  `json:"children,omitempty"`
-	Files       []FileResponse    `json:"files,omitempty"`
-	FileCount   int64             `json:"fileCount"`
-	FolderCount int64             `json:"folderCount"`
-	TotalSize   int64             `json:"totalSize"` // Total size in bytes
+	ID          uuid.UUID        `json:"id"`
+	WorkspaceID uuid.UUID        `json:"workspaceId"`
+	ProjectID   *uuid.UUID       `json:"projectId,omitempty"`
+	ParentID    *uuid.UUID       `json:"parentId,omitempty"`
+	Name        string           `json:"name"`
+	Path        string           `json:"path"`
+	Color       *string          `json:"color,omitempty"`
+	CreatedBy   uuid.UUID        `json:"createdBy"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
+	IsDeleted   bool             `json:"isDeleted"`
+	Children    []FolderResponse `json:"children,omitempty"`
+	Files       []FileResponse   `json:"files,omitempty"`
+	FileCount   int64            `json:"fileCount"`
+	FolderCount int64            `json:"folderCount"`
+	TotalSize   int64            `json:"totalSize"` // Total size in bytes
 }
 
 // ToResponse converts Folder to FolderResponse
@@ -79,6 +83,7 @@ func (f *Folder) ToResponse() FolderResponse {
 	return FolderResponse{
 		ID:          f.ID,
 		WorkspaceID: f.WorkspaceID,
+		ProjectID:   f.ProjectID,
 		ParentID:    f.ParentID,
 		Name:        f.Name,
 		Path:        f.Path,

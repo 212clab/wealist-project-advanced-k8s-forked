@@ -106,6 +106,7 @@ func (s *FileService) GenerateUploadURL(ctx context.Context, req domain.Generate
 	file := &domain.File{
 		ID:           uuid.New(),
 		WorkspaceID:  req.WorkspaceID,
+		ProjectID:    req.ProjectID,
 		FolderID:     req.FolderID,
 		Name:         req.FileName,
 		OriginalName: req.FileName,

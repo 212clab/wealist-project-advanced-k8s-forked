@@ -21,7 +21,8 @@ const (
 type File struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	WorkspaceID uuid.UUID  `gorm:"type:uuid;not null;index" json:"workspaceId"`
-	FolderID    *uuid.UUID `gorm:"type:uuid;index" json:"folderId,omitempty"` // nil means root folder
+	ProjectID   *uuid.UUID `gorm:"type:uuid;index" json:"projectId,omitempty"` // nil means workspace-level (no project)
+	FolderID    *uuid.UUID `gorm:"type:uuid;index" json:"folderId,omitempty"`  // nil means root folder
 	Name        string     `gorm:"size:255;not null" json:"name"`
 	OriginalName string    `gorm:"size:255;not null" json:"originalName"`
 	FileKey     string     `gorm:"size:512;not null;uniqueIndex" json:"fileKey"` // S3 key
@@ -35,8 +36,9 @@ type File struct {
 	DeletedAt   *time.Time `gorm:"index" json:"deletedAt,omitempty"` // Soft delete for trash
 
 	// Relations
-	Folder *Folder     `gorm:"foreignKey:FolderID" json:"folder,omitempty"`
-	Shares []FileShare `gorm:"foreignKey:FileID" json:"shares,omitempty"`
+	Project *Project    `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	Folder  *Folder     `gorm:"foreignKey:FolderID" json:"folder,omitempty"`
+	Shares  []FileShare `gorm:"foreignKey:FileID" json:"shares,omitempty"`
 }
 
 // TableName returns the table name for File
@@ -81,6 +83,7 @@ func (f *File) IsDocument() bool {
 // CreateFileRequest represents request for creating a new file record
 type CreateFileRequest struct {
 	WorkspaceID  uuid.UUID  `json:"workspaceId" binding:"required"`
+	ProjectID    *uuid.UUID `json:"projectId,omitempty"`
 	FolderID     *uuid.UUID `json:"folderId,omitempty"`
 	Name         string     `json:"name" binding:"required"`
 	OriginalName string     `json:"originalName" binding:"required"`
@@ -98,6 +101,7 @@ type UpdateFileRequest struct {
 // GenerateUploadURLRequest represents request for generating presigned upload URL
 type GenerateUploadURLRequest struct {
 	WorkspaceID uuid.UUID  `json:"workspaceId" binding:"required"`
+	ProjectID   *uuid.UUID `json:"projectId,omitempty"`
 	FolderID    *uuid.UUID `json:"folderId,omitempty"`
 	FileName    string     `json:"fileName" binding:"required"`
 	ContentType string     `json:"contentType" binding:"required"`
@@ -121,6 +125,7 @@ type ConfirmUploadRequest struct {
 type FileResponse struct {
 	ID           uuid.UUID  `json:"id"`
 	WorkspaceID  uuid.UUID  `json:"workspaceId"`
+	ProjectID    *uuid.UUID `json:"projectId,omitempty"`
 	FolderID     *uuid.UUID `json:"folderId,omitempty"`
 	Name         string     `json:"name"`
 	OriginalName string     `json:"originalName"`
@@ -143,6 +148,7 @@ func (f *File) ToResponse(fileURL string) FileResponse {
 	return FileResponse{
 		ID:           f.ID,
 		WorkspaceID:  f.WorkspaceID,
+		ProjectID:    f.ProjectID,
 		FolderID:     f.FolderID,
 		Name:         f.Name,
 		OriginalName: f.OriginalName,

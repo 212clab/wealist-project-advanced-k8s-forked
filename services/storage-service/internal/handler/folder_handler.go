@@ -14,13 +14,15 @@ import (
 type FolderHandler struct {
 	folderService *service.FolderService
 	fileService   *service.FileService
+	accessService service.AccessService
 }
 
 // NewFolderHandler creates a new FolderHandler
-func NewFolderHandler(folderService *service.FolderService, fileService *service.FileService) *FolderHandler {
+func NewFolderHandler(folderService *service.FolderService, fileService *service.FileService, accessService service.AccessService) *FolderHandler {
 	return &FolderHandler{
 		folderService: folderService,
 		fileService:   fileService,
+		accessService: accessService,
 	}
 }
 
@@ -43,10 +45,20 @@ func (h *FolderHandler) CreateFolder(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	var req domain.CreateFolderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handleBadRequest(c, "Invalid request body: "+err.Error())
 		return
+	}
+
+	// Validate access (workspace + optional project, need editor permission)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateResourceAccess(c.Request.Context(), req.WorkspaceID, req.ProjectID, userID, token, domain.ProjectPermissionEditor); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	folder, err := h.folderService.CreateFolder(c.Request.Context(), req, userID)
@@ -69,6 +81,14 @@ func (h *FolderHandler) CreateFolder(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/folders/{folderId} [get]
 func (h *FolderHandler) GetFolder(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	folderIDStr := c.Param("folderId")
 	folderID, err := parseUUID(folderIDStr)
 	if err != nil {
@@ -80,6 +100,14 @@ func (h *FolderHandler) GetFolder(c *gin.Context) {
 	if err != nil {
 		handleNotFound(c, err.Error())
 		return
+	}
+
+	// Validate access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFolderAccess(c.Request.Context(), folderID, userID, token, domain.ProjectPermissionViewer); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	respondWithData(c, http.StatusOK, folder.ToResponse())
@@ -97,6 +125,14 @@ func (h *FolderHandler) GetFolder(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/folders/contents [get]
 func (h *FolderHandler) GetFolderContents(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	workspaceIDStr := c.Query("workspaceId")
 	if workspaceIDStr == "" {
 		handleBadRequest(c, "workspaceId is required")
@@ -109,6 +145,14 @@ func (h *FolderHandler) GetFolderContents(c *gin.Context) {
 		return
 	}
 
+	// Validate workspace access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateWorkspaceAccess(c.Request.Context(), workspaceID, userID, token); err != nil {
+			handleServiceError(c, err)
+			return
+		}
+	}
+
 	var folderID *uuid.UUID
 	folderIDStr := c.Query("folderId")
 	if folderIDStr != "" {
@@ -118,6 +162,14 @@ func (h *FolderHandler) GetFolderContents(c *gin.Context) {
 			return
 		}
 		folderID = &id
+
+		// Validate folder access if folder is specified
+		if h.accessService != nil {
+			if err := h.accessService.ValidateFolderAccess(c.Request.Context(), id, userID, token, domain.ProjectPermissionViewer); err != nil {
+				handleServiceError(c, err)
+				return
+			}
+		}
 	}
 
 	response, err := h.folderService.GetFolderContents(c.Request.Context(), workspaceID, folderID)
@@ -145,11 +197,27 @@ func (h *FolderHandler) GetFolderContents(c *gin.Context) {
 // @Security BearerAuth
 // @Router /storage/workspaces/{workspaceId}/folders [get]
 func (h *FolderHandler) GetWorkspaceFolders(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		handleUnauthorized(c, "User not authenticated")
+		return
+	}
+
+	token := c.GetString("jwtToken")
+
 	workspaceIDStr := c.Param("workspaceId")
 	workspaceID, err := parseUUID(workspaceIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid workspace ID")
 		return
+	}
+
+	// Validate workspace access
+	if h.accessService != nil {
+		if err := h.accessService.ValidateWorkspaceAccess(c.Request.Context(), workspaceID, userID, token); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	folders, err := h.folderService.GetWorkspaceFolders(c.Request.Context(), workspaceID)
@@ -186,11 +254,21 @@ func (h *FolderHandler) UpdateFolder(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	folderIDStr := c.Param("folderId")
 	folderID, err := parseUUID(folderIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid folder ID")
 		return
+	}
+
+	// Validate access (need editor permission to update)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFolderAccess(c.Request.Context(), folderID, userID, token, domain.ProjectPermissionEditor); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	var req domain.UpdateFolderRequest
@@ -226,11 +304,21 @@ func (h *FolderHandler) DeleteFolder(c *gin.Context) {
 		return
 	}
 
+	token := c.GetString("jwtToken")
+
 	folderIDStr := c.Param("folderId")
 	folderID, err := parseUUID(folderIDStr)
 	if err != nil {
 		handleBadRequest(c, "Invalid folder ID")
 		return
+	}
+
+	// Validate access (need editor permission to delete)
+	if h.accessService != nil {
+		if err := h.accessService.ValidateFolderAccess(c.Request.Context(), folderID, userID, token, domain.ProjectPermissionEditor); err != nil {
+			handleServiceError(c, err)
+			return
+		}
 	}
 
 	if err := h.folderService.DeleteFolder(c.Request.Context(), folderID, userID); err != nil {

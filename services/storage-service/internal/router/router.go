@@ -63,16 +63,20 @@ func Setup(cfg Config) *gin.Engine {
 	folderRepo := repository.NewFolderRepository(cfg.DB)
 	fileRepo := repository.NewFileRepository(cfg.DB)
 	shareRepo := repository.NewShareRepository(cfg.DB)
+	projectRepo := repository.NewProjectRepository(cfg.DB)
 
 	// Initialize services
 	folderService := service.NewFolderService(folderRepo, fileRepo, cfg.Logger)
 	fileService := service.NewFileService(fileRepo, folderRepo, cfg.S3Client, cfg.Logger)
 	shareService := service.NewShareService(shareRepo, fileRepo, folderRepo, cfg.Logger)
+	projectService := service.NewProjectService(projectRepo, cfg.UserClient, cfg.Logger)
+	accessService := service.NewAccessService(projectRepo, fileRepo, folderRepo, cfg.UserClient, cfg.Logger)
 
 	// Initialize handlers
-	folderHandler := handler.NewFolderHandler(folderService, fileService)
-	fileHandler := handler.NewFileHandler(fileService)
+	folderHandler := handler.NewFolderHandler(folderService, fileService, accessService)
+	fileHandler := handler.NewFileHandler(fileService, accessService)
 	shareHandler := handler.NewShareHandler(shareService)
+	projectHandler := handler.NewProjectHandler(projectService)
 
 	// API routes group
 	api := r.Group(cfg.BasePath)
@@ -141,10 +145,30 @@ func Setup(cfg Config) *gin.Engine {
 		storage.GET("/shared-with-me", shareHandler.GetSharedWithMe)
 
 		// ============================================================
+		// Project routes
+		// ============================================================
+		projects := storage.Group("/projects")
+		{
+			projects.POST("", projectHandler.CreateProject)
+			projects.GET("/:projectId", projectHandler.GetProject)
+			projects.PUT("/:projectId", projectHandler.UpdateProject)
+			projects.DELETE("/:projectId", projectHandler.DeleteProject)
+
+			// Project members
+			projects.POST("/:projectId/members", projectHandler.AddMember)
+			projects.GET("/:projectId/members", projectHandler.GetMembers)
+			projects.PUT("/:projectId/members/:userId", projectHandler.UpdateMember)
+			projects.DELETE("/:projectId/members/:userId", projectHandler.RemoveMember)
+		}
+
+		// ============================================================
 		// Workspace routes
 		// ============================================================
 		workspaces := storage.Group("/workspaces")
 		{
+			// Projects in workspace
+			workspaces.GET("/:workspaceId/projects", projectHandler.GetWorkspaceProjects)
+
 			workspaces.GET("/:workspaceId/folders", folderHandler.GetWorkspaceFolders)
 			workspaces.GET("/:workspaceId/files", fileHandler.GetWorkspaceFiles)
 			workspaces.GET("/:workspaceId/files/search", fileHandler.SearchFiles)

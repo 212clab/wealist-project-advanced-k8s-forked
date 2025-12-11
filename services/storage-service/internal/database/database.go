@@ -44,6 +44,8 @@ func New(cfg Config) (*gorm.DB, error) {
 // AutoMigrate runs database migrations
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
+		&domain.Project{},
+		&domain.ProjectMember{},
 		&domain.Folder{},
 		&domain.File{},
 		&domain.FileShare{},
