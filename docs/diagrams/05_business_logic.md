@@ -1,12 +1,12 @@
 # weAlist 비즈니스 로직 다이어그램
 
 > **작성일**: 2025-12-12
-> **작성자**: Team A
 > **목적**: weAlist 플랫폼의 핵심 비즈니스 로직 흐름 시각화
 
 ---
 
 ## 목차
+
 1. [전체 시스템 개요](#1-전체-시스템-개요)
 2. [사용자 인증 플로우](#2-사용자-인증-플로우)
 3. [워크스페이스 & 프로젝트 관리](#3-워크스페이스--프로젝트-관리)
@@ -946,13 +946,13 @@ flowchart TD
 
 ### 9.3 내부 API 호출 매트릭스
 
-| 호출 서비스 | 대상 서비스 | 엔드포인트 | 목적 |
-|------------|------------|-----------|------|
-| Auth | User | `POST /api/internal/oauth/login` | OAuth 사용자 생성/조회 |
-| Board | User | `GET /api/internal/users/{id}/exists` | 사용자 존재 확인 |
-| Board | Noti | `POST /api/internal/notifications` | 알림 생성 |
-| Chat | Noti | `POST /api/internal/notifications` | 알림 생성 |
-| Storage | User | `GET /api/internal/users/{id}` | 소유자 확인 |
+| 호출 서비스 | 대상 서비스 | 엔드포인트                            | 목적                   |
+| ----------- | ----------- | ------------------------------------- | ---------------------- |
+| Auth        | User        | `POST /api/internal/oauth/login`      | OAuth 사용자 생성/조회 |
+| Board       | User        | `GET /api/internal/users/{id}/exists` | 사용자 존재 확인       |
+| Board       | Noti        | `POST /api/internal/notifications`    | 알림 생성              |
+| Chat        | Noti        | `POST /api/internal/notifications`    | 알림 생성              |
+| Storage     | User        | `GET /api/internal/users/{id}`        | 소유자 확인            |
 
 ---
 
