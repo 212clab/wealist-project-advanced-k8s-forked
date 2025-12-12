@@ -723,7 +723,7 @@ flowchart TD
     end
 
     subgraph PublicAccess["공개 링크"]
-        PA1[/api/public/storage/shares/link/{token}]
+        PA1["GET /shares/link/:token"]
         PA2[토큰 검증]
         PA3[파일 정보 반환]
         PA4[Presigned Download URL]
@@ -819,7 +819,7 @@ sequenceDiagram
     actor Others as 다른 참여자들
 
     Participant->>FE: 영상통화 참여
-    FE->>VideoSvc: POST /api/rooms/{id}/join
+    FE->>VideoSvc: POST /rooms/:id/join
 
     VideoSvc->>DB: Participant 레코드 생성
     VideoSvc->>LiveKit: Token 생성
@@ -833,7 +833,7 @@ sequenceDiagram
     Note over FE,Others: 영상통화 진행...
 
     Participant->>FE: 퇴장 버튼
-    FE->>VideoSvc: POST /api/rooms/{id}/leave
+    FE->>VideoSvc: POST /rooms/:id/leave
     VideoSvc->>DB: left_at 업데이트
     FE->>LiveKit: 연결 종료
     LiveKit->>Others: 참여자 퇴장 알림
