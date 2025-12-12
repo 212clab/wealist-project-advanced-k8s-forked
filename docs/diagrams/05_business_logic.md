@@ -860,7 +860,7 @@ flowchart TD
     end
 
     subgraph Internal["내부 통신"]
-        I1[/api/internal/*]
+        I1["/api/internal/*"]
         I2[API Key 인증]
         I3[서비스 간 직접 호출]
     end
@@ -912,14 +912,14 @@ flowchart TD
     NGINX --> STORAGE
     NGINX --> VIDEO
 
-    AUTH -->|OAuth Login| USER
+    AUTH -->|"OAuth Login"| USER
     AUTH --> REDIS
 
-    BOARD -->|User 확인| USER
-    BOARD -->|알림 생성| NOTI
+    BOARD -->|"User Check"| USER
+    BOARD -->|"Notification"| NOTI
     BOARD --> PG
 
-    CHAT -->|알림 생성| NOTI
+    CHAT -->|"Notification"| NOTI
     CHAT --> PG
     CHAT --> REDIS
 
@@ -953,33 +953,6 @@ flowchart TD
 | Board       | Noti        | `POST /api/internal/notifications`    | 알림 생성              |
 | Chat        | Noti        | `POST /api/internal/notifications`    | 알림 생성              |
 | Storage     | User        | `GET /api/internal/users/{id}`        | 소유자 확인            |
-
----
-
-## 부록: 향후 확장 계획
-
-### 추가 예정 기능
-
-```mermaid
-mindmap
-  root((향후 계획))
-    인증 강화
-      2FA 지원
-      SSO 연동
-      세션 관리
-    협업 기능
-      캘린더 통합
-      타임라인 뷰
-      간트 차트
-    AI 기능
-      자동 태스크 분류
-      스마트 알림
-      미팅 요약
-    통합
-      Slack 연동
-      Jira 연동
-      GitHub 연동
-```
 
 ---
 
