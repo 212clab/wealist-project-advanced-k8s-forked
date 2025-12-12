@@ -43,6 +43,15 @@ help:
 	@echo "    auth-service, board-service, chat-service, frontend,"
 	@echo "    noti-service, storage-service, user-service, video-service"
 	@echo ""
+	@echo "  Helm Charts (Recommended):"
+	@echo "    make helm-lint           - Lint all Helm charts"
+	@echo "    make helm-install-infra  - Install infrastructure chart"
+	@echo "    make helm-install-services - Install all service charts"
+	@echo "    make helm-install-all    - Install infrastructure + services"
+	@echo "    make helm-upgrade-all    - Upgrade all charts"
+	@echo "    make helm-uninstall-all  - Uninstall all charts"
+	@echo "    make helm-validate       - Run comprehensive validation"
+	@echo ""
 	@echo "  Utility:"
 	@echo "    make status       - Show pods status"
 	@echo "    make clean        - Clean up"
@@ -289,3 +298,74 @@ status:
 
 clean:
 	./docker/scripts/clean.sh
+
+# =============================================================================
+# Helm Charts
+# =============================================================================
+
+.PHONY: helm-lint helm-install-infra helm-install-services helm-install-all
+.PHONY: helm-upgrade-all helm-uninstall-all helm-validate
+
+HELM_NAMESPACE ?= wealist-dev
+HELM_VALUES_FILE ?= values-develop-registry-local.yaml
+SERVICES = auth-service user-service board-service chat-service noti-service storage-service video-service frontend
+
+helm-lint:
+	@echo "🔍 Linting all Helm charts..."
+	@helm lint ./helm/charts/wealist-common
+	@helm lint ./helm/charts/wealist-infrastructure
+	@for service in $(SERVICES); do \
+		echo "Linting $$service..."; \
+		helm lint ./helm/charts/$$service; \
+	done
+	@echo "✅ All charts linted successfully!"
+
+helm-install-infra:
+	@echo "📦 Installing infrastructure chart..."
+	helm install wealist-infrastructure ./helm/charts/wealist-infrastructure \
+		-f ./helm/charts/wealist-infrastructure/$(HELM_VALUES_FILE) \
+		-n $(HELM_NAMESPACE) --create-namespace
+	@echo "✅ Infrastructure installed!"
+
+helm-install-services:
+	@echo "📦 Installing all service charts..."
+	@for service in $(SERVICES); do \
+		echo "Installing $$service..."; \
+		helm install $$service ./helm/charts/$$service \
+			-f ./helm/charts/$$service/$(HELM_VALUES_FILE) \
+			-n $(HELM_NAMESPACE); \
+	done
+	@echo "✅ All services installed!"
+
+helm-install-all: helm-install-infra
+	@sleep 5
+	@$(MAKE) helm-install-services
+
+helm-upgrade-all:
+	@echo "🔄 Upgrading all charts..."
+	@helm upgrade wealist-infrastructure ./helm/charts/wealist-infrastructure \
+		-f ./helm/charts/wealist-infrastructure/$(HELM_VALUES_FILE) \
+		-n $(HELM_NAMESPACE)
+	@for service in $(SERVICES); do \
+		echo "Upgrading $$service..."; \
+		helm upgrade $$service ./helm/charts/$$service \
+			-f ./helm/charts/$$service/$(HELM_VALUES_FILE) \
+			-n $(HELM_NAMESPACE); \
+	done
+	@echo "✅ All charts upgraded!"
+
+helm-uninstall-all:
+	@echo "🗑️  Uninstalling all charts..."
+	@for service in $(SERVICES); do \
+		echo "Uninstalling $$service..."; \
+		helm uninstall $$service -n $(HELM_NAMESPACE) 2>/dev/null || true; \
+	done
+	@helm uninstall wealist-infrastructure -n $(HELM_NAMESPACE) 2>/dev/null || true
+	@echo "✅ All charts uninstalled!"
+
+helm-validate:
+	@echo "🔍 Running comprehensive Helm validation..."
+	@./helm/scripts/validate-all-charts.sh
+	@echo ""
+	@echo "🔍 Running ArgoCD Applications validation..."
+	@./argocd/scripts/validate-applications.sh
