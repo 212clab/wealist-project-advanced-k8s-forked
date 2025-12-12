@@ -4,9 +4,9 @@ metadata:
   name: wealist-ingress
   namespace: wealist-dev
   annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
     # WebSocket & SSE support
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -14,10 +14,18 @@ metadata:
     # WebSocket services: board(ws), chat(ws), livekit(webrtc)
     nginx.ingress.kubernetes.io/websocket-services: "board-service,chat-service,livekit"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    # SSL/TLS settings
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - __LOCAL_DOMAIN__
+      secretName: local-wealist-tls
   rules:
-    - http:
+    - host: __LOCAL_DOMAIN__
+      http:
         paths:
           # ============================================
           # OAuth2 Routes (auth-service)
@@ -114,6 +122,17 @@ spec:
                 name: livekit
                 port:
                   number: 7880
+
+          # ============================================
+          # MinIO Proxy (S3 Presigned URL 접근용)
+          # ============================================
+          - path: /minio(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000
 
           # ============================================
           # Frontend (catch-all, 맨 마지막)
