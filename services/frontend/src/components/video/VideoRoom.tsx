@@ -31,6 +31,7 @@ import {
   Participant,
   DataPacket_Kind,
   LocalTrackPublication,
+  DisconnectReason,
 } from 'livekit-client';
 
 // Display mode types
@@ -47,6 +48,7 @@ interface VideoRoomProps {
   token: string;
   wsUrl: string;
   onLeave: () => void;
+  onTokenRefresh?: () => Promise<{ token: string; wsUrl: string } | null>;
   userProfile?: UserProfile | null;
 }
 
@@ -177,9 +179,10 @@ const VideoTrackRenderer: React.FC<{
 
 export const VideoRoom: React.FC<VideoRoomProps> = ({
   room: roomInfo,
-  token,
-  wsUrl,
+  token: initialToken,
+  wsUrl: initialWsUrl,
   onLeave,
+  onTokenRefresh,
   userProfile,
 }) => {
   const [room, setRoom] = useState<Room | null>(null);
@@ -187,6 +190,12 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
   const [remoteSubtitles, setRemoteSubtitles] = useState<Map<string, RemoteSubtitle>>(new Map());
+
+  // Token state for rejoin
+  const [currentToken, setCurrentToken] = useState(initialToken);
+  const [currentWsUrl, setCurrentWsUrl] = useState(initialWsUrl);
+  const rejoinAttemptsRef = useRef(0);
+  const maxRejoinAttempts = 3;
 
   // Local state
   const [isMuted, setIsMuted] = useState(false);
@@ -234,6 +243,16 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       videoCaptureDefaults: {
         resolution: VideoPresets.h720.resolution,
       },
+      // Reconnection options
+      reconnectPolicy: {
+        nextRetryDelayInMs: (context) => {
+          // Exponential backoff: 300ms, 600ms, 1200ms, ... up to 10s
+          const delay = Math.min(300 * Math.pow(2, context.retryCount), 10000);
+          console.log(`[VideoRoom] Reconnect attempt ${context.retryCount + 1}, delay: ${delay}ms`);
+          return delay;
+        },
+      },
+      disconnectOnPageLeave: true,
     });
 
     setRoom(newRoom);
@@ -243,20 +262,51 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
     };
   }, []);
 
+  // Rejoin room with new token
+  const attemptRejoin = useCallback(async () => {
+    if (!onTokenRefresh || rejoinAttemptsRef.current >= maxRejoinAttempts) {
+      console.log('[VideoRoom] Max rejoin attempts reached or no token refresh callback');
+      setConnectionState('error');
+      setError('연결을 복구할 수 없습니다. 다시 참가해주세요.');
+      return;
+    }
+
+    rejoinAttemptsRef.current += 1;
+    console.log(`[VideoRoom] Attempting rejoin ${rejoinAttemptsRef.current}/${maxRejoinAttempts}`);
+    setConnectionState('reconnecting');
+
+    try {
+      const newCredentials = await onTokenRefresh();
+      if (!newCredentials) {
+        throw new Error('Failed to get new token');
+      }
+
+      setCurrentToken(newCredentials.token);
+      setCurrentWsUrl(newCredentials.wsUrl);
+      console.log('[VideoRoom] Got new token, will reconnect');
+    } catch (e) {
+      console.error('[VideoRoom] Failed to refresh token:', e);
+      // Try again with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, rejoinAttemptsRef.current), 10000);
+      setTimeout(attemptRejoin, delay);
+    }
+  }, [onTokenRefresh, maxRejoinAttempts]);
+
   // Connect to LiveKit
   useEffect(() => {
-    if (!room || !token || !wsUrl) return;
+    if (!room || !currentToken || !currentWsUrl) return;
 
     const connect = async () => {
       try {
         console.log(
           '[VideoRoom] Connecting with WS URL:',
-          wsUrl,
+          currentWsUrl,
           'Token:',
-          token?.slice(0, 10) + '...',
+          currentToken?.slice(0, 10) + '...',
         );
-        await room.connect(wsUrl, token);
+        await room.connect(currentWsUrl, currentToken);
         setConnectionState('connected');
+        rejoinAttemptsRef.current = 0; // Reset rejoin attempts on successful connection
         updateParticipants();
 
         // Set participant metadata (profile info) - non-blocking
@@ -401,6 +451,34 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       updateParticipants(); // Re-render to show speaking indicator if needed
     };
 
+    // Connection state event handlers
+    const onDisconnected = (reason?: DisconnectReason) => {
+      console.log('[VideoRoom] Disconnected from room, reason:', reason);
+      setConnectionState('disconnected');
+
+      // If we have a token refresh callback, attempt to rejoin
+      // This handles cases where LiveKit's built-in reconnection fails
+      if (onTokenRefresh && rejoinAttemptsRef.current < maxRejoinAttempts) {
+        console.log('[VideoRoom] Will attempt to rejoin with new token');
+        // Wait a bit before attempting rejoin to avoid rapid reconnection loops
+        setTimeout(() => {
+          attemptRejoin();
+        }, 2000);
+      }
+    };
+
+    const onReconnecting = () => {
+      console.log('[VideoRoom] Reconnecting to room...');
+      setConnectionState('reconnecting');
+    };
+
+    const onReconnected = () => {
+      console.log('[VideoRoom] Successfully reconnected to room');
+      setConnectionState('connected');
+      rejoinAttemptsRef.current = 0; // Reset rejoin attempts
+      updateParticipants();
+    };
+
     room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
     room.on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
     room.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
@@ -409,6 +487,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
     room.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
     room.on(RoomEvent.DataReceived, onDataReceived);
     room.on(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged);
+    room.on(RoomEvent.Disconnected, onDisconnected);
+    room.on(RoomEvent.Reconnecting, onReconnecting);
+    room.on(RoomEvent.Reconnected, onReconnected);
 
     // Also listed to mute/unmute events for UI updates
     room.on(RoomEvent.TrackMuted, updateParticipants);
@@ -423,10 +504,13 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       room.off(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
       room.off(RoomEvent.DataReceived, onDataReceived);
       room.off(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged);
-      room.on(RoomEvent.TrackMuted, updateParticipants);
-      room.on(RoomEvent.TrackUnmuted, updateParticipants);
+      room.off(RoomEvent.Disconnected, onDisconnected);
+      room.off(RoomEvent.Reconnecting, onReconnecting);
+      room.off(RoomEvent.Reconnected, onReconnected);
+      room.off(RoomEvent.TrackMuted, updateParticipants);
+      room.off(RoomEvent.TrackUnmuted, updateParticipants);
     };
-  }, [room, token, wsUrl]);
+  }, [room, currentToken, currentWsUrl, onTokenRefresh, attemptRejoin]);
 
   const updateParticipants = useCallback(() => {
     if (!room) return;
@@ -715,6 +799,36 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
     );
   }
 
+  // Reconnecting overlay - shown on top of the video room
+  const ReconnectingOverlay = () => {
+    if (connectionState !== 'reconnecting' && connectionState !== 'disconnected') return null;
+
+    return (
+      <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-[60] backdrop-blur-sm">
+        <div className="text-center text-white">
+          <div className="w-16 h-16 mx-auto mb-4 relative">
+            <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full" />
+            <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">
+            {connectionState === 'reconnecting' ? '재연결 중...' : '연결이 끊어졌습니다'}
+          </h2>
+          <p className="text-gray-400 mb-4">
+            {connectionState === 'reconnecting'
+              ? '잠시만 기다려주세요'
+              : '재연결을 시도하고 있습니다'}
+          </p>
+          <button
+            onClick={onLeave}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-sm"
+          >
+            나가기
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Helper to get video track
   const getParticipantVideoTrack = (p: Participant) => {
     const pub = p.getTrackPublication(Track.Source.Camera);
@@ -779,7 +893,7 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
                 className={`w-2 h-2 rounded-full ${
                   connectionState === 'connected'
                     ? 'bg-green-500'
-                    : connectionState === 'connecting'
+                    : connectionState === 'connecting' || connectionState === 'reconnecting'
                     ? 'bg-yellow-500 animate-pulse'
                     : 'bg-red-500'
                 }`}
@@ -803,6 +917,20 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white border-2 border-gray-600">
                   {localP?.name?.[0]?.toUpperCase() || '나'}
+                </div>
+              </div>
+            )}
+            {/* Mini mode reconnecting overlay */}
+            {(connectionState === 'reconnecting' || connectionState === 'disconnected') && (
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
+                <div className="text-center text-white">
+                  <div className="w-8 h-8 mx-auto mb-2 relative">
+                    <div className="absolute inset-0 border-2 border-blue-500/30 rounded-full" />
+                    <div className="absolute inset-0 border-2 border-transparent border-t-blue-500 rounded-full animate-spin" />
+                  </div>
+                  <span className="text-xs">
+                    {connectionState === 'reconnecting' ? '재연결 중...' : '연결 끊김'}
+                  </span>
                 </div>
               </div>
             )}
@@ -850,6 +978,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   // Full Mode
   return (
     <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
+      {/* Reconnecting overlay */}
+      <ReconnectingOverlay />
+
       {joinNotification && (
         <div className="absolute top-16 right-4 z-50 animate-fade-in">
           <div className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
