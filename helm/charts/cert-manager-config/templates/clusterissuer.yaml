@@ -5,6 +5,10 @@ metadata:
   name: {{ include "cert-manager-config.issuerName" . }}
   labels:
     {{- include "cert-manager-config.labels" . | nindent 4 }}
+  annotations:
+    # Wait for cert-manager CRDs to be installed first
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
 spec:
   acme:
     # ACME server URL
