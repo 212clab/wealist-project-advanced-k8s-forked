@@ -78,7 +78,7 @@ patches:
         value: "https://__PUBLIC_DOMAIN__/oauth/callback"
       - op: replace
         path: /data/OAUTH2_CLIENT_REDIRECT_URI
-        value: "https://__PUBLIC_DOMAIN__/login/oauth2/code/google"
+        value: "https://__PUBLIC_DOMAIN__/oauth2/callback/google"
 
   # Chat service: Add SERVER_BASE_PATH for ingress routing
   - target:

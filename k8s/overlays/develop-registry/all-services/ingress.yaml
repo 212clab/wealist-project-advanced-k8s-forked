@@ -30,13 +30,6 @@ spec:
                 name: auth-service
                 port:
                   number: 8080
-          - path: /()(login/oauth2/.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 8080
 
           # ============================================
           # Service Routes (prefix 기반 라우팅)
@@ -126,4 +119,3 @@ spec:
                 name: minio
                 port:
                   number: 9000
-
