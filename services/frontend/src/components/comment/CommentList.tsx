@@ -14,7 +14,7 @@ import {
 import { WorkspaceMemberResponse } from '../../types/user';
 import { useUserLookup } from '../../hooks/useUserLookup';
 import { useFileUpload } from '../../hooks/useFileUpload';
-import { ChangeEvent } from 'react'; // ChangeEvent 명시적 임포트
+import { ChangeEvent } from 'react'; // ChangeEvent 명시적 임포트!
 
 // =============================================================================
 // [Sub Component] 댓글 작성 인풋 (Compact Style)
