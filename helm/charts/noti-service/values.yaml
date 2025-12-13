@@ -45,8 +45,9 @@ config:
   PORT: "8002"
   SERVER_PORT: "8002"
 
-  # Database (service-specific database name)
+  # Database (service-specific)
   DB_NAME: "wealist_noti_service_db"
+  DATABASE_URL: "postgresql://noti_service:noti_service_password@postgres:5432/wealist_noti_service_db?sslmode=disable"
 
 # -----------------------------------------------------------------------------
 # External Secrets

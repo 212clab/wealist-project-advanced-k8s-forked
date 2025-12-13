@@ -45,8 +45,9 @@ config:
   PORT: "8003"
   SERVER_PORT: "8003"
 
-  # Database (service-specific database name)
+  # Database (service-specific)
   DB_NAME: "wealist_storage_service_db"
+  DATABASE_URL: "postgresql://storage_service:storage_service_password@postgres:5432/wealist_storage_service_db?sslmode=disable"
 
 # -----------------------------------------------------------------------------
 # External Secrets

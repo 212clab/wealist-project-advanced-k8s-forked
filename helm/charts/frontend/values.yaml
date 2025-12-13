@@ -109,9 +109,16 @@ autoscaling:
 # -----------------------------------------------------------------------------
 # Security
 # -----------------------------------------------------------------------------
-# Note: podSecurityContext and securityContext are inherited from
-# helm/environments/*.yaml files. NGINX needs write access to /var/cache/nginx
-# so readOnlyRootFilesystem must be false (set in local-kind.yaml, local-ubuntu.yaml)
+# NGINX needs root to set up cache directory permissions on startup
+# Override environment defaults for nginx compatibility
+podSecurityContext:
+  runAsNonRoot: false
+
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 0  # Run as root for nginx
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
 
 # -----------------------------------------------------------------------------
 # Service Account

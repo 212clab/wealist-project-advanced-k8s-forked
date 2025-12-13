@@ -157,6 +157,10 @@ shared:
     INTERNAL_API_KEY: "internal-key-change-me"
     JWT_SECRET: "dev-jwt-secret-change-in-production"
 
+    # OAuth2 (placeholder for local - replace in production)
+    GOOGLE_CLIENT_ID: "placeholder-client-id.apps.googleusercontent.com"
+    GOOGLE_CLIENT_SECRET: "placeholder-client-secret"
+
     # LiveKit (WebRTC)
     LIVEKIT_URL: "http://livekit:7880"
     LIVEKIT_WS_URL: "ws://localhost/svc/livekit"
