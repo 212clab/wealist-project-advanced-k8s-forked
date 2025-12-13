@@ -84,12 +84,7 @@ jobs:
         run: |
           # Inject API_DOMAIN for WebSocket/SSE direct connection (bypasses CloudFront)
           if [ -n "$API_DOMAIN" ]; then
-            cat > dist/config.js << EOF
-            window.__ENV__ = {
-              API_BASE_URL: "",
-              API_DOMAIN: "$API_DOMAIN"
-            };
-            EOF
+            printf 'window.__ENV__ = {\n  API_BASE_URL: "",\n  API_DOMAIN: "%s"\n};\n' "$API_DOMAIN" > dist/config.js
             echo "Injected API_DOMAIN: $API_DOMAIN"
           else
             echo "API_DOMAIN not set, WebSocket will use CloudFront (may have issues)"
