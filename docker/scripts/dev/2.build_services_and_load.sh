@@ -41,6 +41,19 @@ echo ""
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
+# Detect if service uses common packages (requires project root context)
+uses_common_packages() {
+    local name="$1"
+    case "$name" in
+        chat-service|user-service)
+            return 0  # true - uses common packages
+            ;;
+        *)
+            return 1  # false - doesn't use common packages
+            ;;
+    esac
+}
+
 # 서비스 정보 배열
 declare -a SERVICES=(
     "auth-service|services/auth-service|Dockerfile"
@@ -96,7 +109,17 @@ build_service() {
         echo "Image: $image_name"
         echo ""
 
-        if docker build -t "$image_name" -f "$path/$dockerfile" . 2>&1; then
+        # Determine build context based on service type
+        local build_context
+        if uses_common_packages "$name"; then
+            build_context="."
+            echo "Using project root context (common packages)"
+        else
+            build_context="$path"
+            echo "Using service directory context"
+        fi
+
+        if docker build -t "$image_name" -f "$path/$dockerfile" "$build_context" 2>&1; then
             echo ""
             echo "Pushing to local registry..."
             if docker push "$image_name" 2>&1; then
