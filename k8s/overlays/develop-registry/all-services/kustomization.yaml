@@ -166,3 +166,36 @@ patches:
       - op: replace
         path: /data/LIVEKIT_WS_URL
         value: "wss://__PUBLIC_DOMAIN__/svc/livekit"
+
+  # LiveKit: Configure for external access with API domain
+  # This patches the livekit.yaml embedded in the ConfigMap
+  - target:
+      kind: ConfigMap
+      name: livekit-config
+    patch: |-
+      - op: replace
+        path: /data/livekit.yaml
+        value: |
+          port: 7880
+          rtc:
+            port_range_start: 50000
+            port_range_end: 60000
+            tcp_port: 7881
+            # For NAT/firewall environments, explicitly set node_ip
+            use_external_ip: false
+            node_ip: "__API_DOMAIN__"
+            enable_loopback_candidate: false
+          keys:
+            devkey: devsecretkey1234567890abcdefghijk
+          logging:
+            level: debug
+            json: false
+          room:
+            empty_timeout: 300
+            max_participants: 100
+          turn:
+            enabled: true
+            domain: __API_DOMAIN__
+            tls_port: 0
+            udp_port: 3478
+            tcp_port: 3478
