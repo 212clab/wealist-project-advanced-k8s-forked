@@ -9,8 +9,7 @@
 # -----------------------------------------------------------------------------
 image:
   repository: board-service
-  pullPolicy: IfNotPresent
-  tag: "1.0.0"
+  # pullPolicy and tag are set in helm/environments/*.yaml
 
 imagePullSecrets: []
 

@@ -10,8 +10,7 @@
 # -----------------------------------------------------------------------------
 image:
   repository: user-service
-  tag: ""  # Defaults to Chart.appVersion if not set
-  pullPolicy: IfNotPresent
+  # pullPolicy and tag are set in helm/environments/*.yaml
 
 imagePullSecrets: []
 # - name: registry-secret
