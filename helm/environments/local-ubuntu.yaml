@@ -14,6 +14,25 @@ global:
   imageRegistry: localhost:5001
 
 # -----------------------------------------------------------------------------
+# cert-manager Configuration (TLS with Let's Encrypt)
+# -----------------------------------------------------------------------------
+# Uses HTTP01 challenge - no AWS credentials needed!
+# Just requires port 80 accessible from internet
+certManager:
+  enabled: true
+  installCertManager: true
+
+  issuer:
+    name: letsencrypt-prod
+    email: ressk4149@gmail.com
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+
+  solver:
+    type: http01  # Simple! No AWS keys needed
+    http01:
+      ingressClass: nginx
+
+# -----------------------------------------------------------------------------
 # Deployment Settings
 # -----------------------------------------------------------------------------
 replicaCount: 1
@@ -80,10 +99,13 @@ shared:
     LIVEKIT_WS_URL: "wss://local.wealist.co.kr/svc/livekit"
 
 # -----------------------------------------------------------------------------
-# Ingress (local.wealist.co.kr with TLS)
+# Ingress (local.wealist.co.kr with TLS via cert-manager)
 # -----------------------------------------------------------------------------
 ingress:
   enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   hosts:
     - host: local.wealist.co.kr
   tls:

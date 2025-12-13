@@ -71,10 +71,14 @@ help:
 	@echo ""
 	@echo "  Helm Charts (Recommended):"
 	@echo "    make helm-lint           - Lint all Helm charts"
-	@echo "    make helm-install-all    - Install infrastructure + services"
+	@echo "    make helm-install-all    - Install cert-manager + infrastructure + services"
 	@echo "    make helm-upgrade-all    - Upgrade all charts"
 	@echo "    make helm-uninstall-all  - Uninstall all charts"
 	@echo "    make helm-validate       - Run comprehensive validation"
+	@echo ""
+	@echo "  TLS/cert-manager:"
+	@echo "    make helm-install-cert-manager  - Install cert-manager only"
+	@echo "    (HTTP01 challenge - no AWS credentials needed!)"
 	@echo ""
 	@echo "  Helm Environment Selection (ENV=<env>):"
 	@echo "    make helm-install-all ENV=local-kind   - Kind cluster (wealist-kind-local)"
@@ -382,9 +386,10 @@ clean:
 # Helm Charts
 # =============================================================================
 
-.PHONY: helm-lint helm-install-infra helm-install-services helm-install-all
+.PHONY: helm-lint helm-install-cert-manager helm-install-infra helm-install-services helm-install-all
 .PHONY: helm-upgrade-all helm-uninstall-all helm-validate
 .PHONY: helm-local-kind helm-local-ubuntu helm-dev helm-staging helm-prod
+.PHONY: helm-setup-route53-secret
 
 # Helm values files (uses K8S_NAMESPACE defined at top of file)
 HELM_BASE_VALUES = ./helm/environments/base.yaml
@@ -396,11 +401,45 @@ helm-lint:
 	@echo "🔍 Linting all Helm charts..."
 	@helm lint ./helm/charts/wealist-common
 	@helm lint ./helm/charts/wealist-infrastructure
+	@helm lint ./helm/charts/cert-manager-config 2>/dev/null || echo "⚠️  cert-manager-config: run 'helm dependency update' first"
 	@for service in $(SERVICES); do \
 		echo "Linting $$service..."; \
 		helm lint ./helm/charts/$$service; \
 	done
 	@echo "✅ All charts linted successfully!"
+
+# Helper to create Route53 credentials secret
+helm-setup-route53-secret:
+	@echo "🔐 Setting up Route53 credentials secret..."
+	@kubectl create namespace cert-manager 2>/dev/null || true
+	@if [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then \
+		echo "❌ Error: AWS_SECRET_ACCESS_KEY environment variable not set"; \
+		echo "Usage: AWS_SECRET_ACCESS_KEY=xxx make helm-setup-route53-secret"; \
+		exit 1; \
+	fi
+	@kubectl create secret generic route53-credentials \
+		--namespace cert-manager \
+		--from-literal=secret-access-key=$$AWS_SECRET_ACCESS_KEY \
+		--dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ Route53 credentials secret created/updated!"
+
+# Install cert-manager (conditional based on environment)
+helm-install-cert-manager:
+	@echo "🔐 Checking cert-manager configuration (ENV=$(ENV))..."
+	@if grep -q "certManager:" "$(HELM_ENV_VALUES)" 2>/dev/null && \
+	   grep -A1 "certManager:" "$(HELM_ENV_VALUES)" | grep -q "enabled: true"; then \
+		echo "📦 Installing cert-manager-config..."; \
+		cd ./helm/charts/cert-manager-config && helm dependency update && cd -; \
+		helm upgrade --install cert-manager-config ./helm/charts/cert-manager-config \
+			-f $(HELM_BASE_VALUES) \
+			-f $(HELM_ENV_VALUES) \
+			-n cert-manager --create-namespace --wait --timeout 5m; \
+		echo "✅ cert-manager installed!"; \
+		echo "⏳ Waiting for cert-manager webhook to be ready..."; \
+		sleep 10; \
+	else \
+		echo "⏭️  Skipping cert-manager (disabled for $(ENV))"; \
+	fi
 
 helm-install-infra:
 	@echo "📦 Installing infrastructure (ENV=$(ENV), NS=$(K8S_NAMESPACE))..."
@@ -423,7 +462,7 @@ helm-install-services:
 	done
 	@echo "✅ All services installed!"
 
-helm-install-all: helm-install-infra
+helm-install-all: helm-install-cert-manager helm-install-infra
 	@sleep 5
 	@$(MAKE) helm-install-services ENV=$(ENV)
 
@@ -451,6 +490,11 @@ helm-uninstall-all:
 		helm uninstall $$service -n $(K8S_NAMESPACE) 2>/dev/null || true; \
 	done
 	@helm uninstall wealist-infrastructure -n $(K8S_NAMESPACE) 2>/dev/null || true
+	@echo "🔐 Checking if cert-manager should be uninstalled..."
+	@if helm list -n cert-manager 2>/dev/null | grep -q cert-manager-config; then \
+		echo "Uninstalling cert-manager-config..."; \
+		helm uninstall cert-manager-config -n cert-manager 2>/dev/null || true; \
+	fi
 	@echo "✅ All charts uninstalled!"
 
 helm-validate:
