@@ -394,6 +394,10 @@ clean:
 # Helm values files (uses K8S_NAMESPACE defined at top of file)
 HELM_BASE_VALUES = ./helm/environments/base.yaml
 HELM_ENV_VALUES = ./helm/environments/$(ENV).yaml
+HELM_SECRETS_VALUES = ./helm/environments/$(ENV)-secrets.yaml
+
+# Conditionally add secrets file if it exists
+HELM_SECRETS_FLAG = $(shell test -f $(HELM_SECRETS_VALUES) && echo "-f $(HELM_SECRETS_VALUES)")
 
 SERVICES = auth-service user-service board-service chat-service noti-service storage-service video-service frontend
 
@@ -432,7 +436,7 @@ helm-install-cert-manager:
 		cd ./helm/charts/cert-manager-config && helm dependency update && cd -; \
 		helm upgrade --install cert-manager-config ./helm/charts/cert-manager-config \
 			-f $(HELM_BASE_VALUES) \
-			-f $(HELM_ENV_VALUES) \
+			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 			-n cert-manager --create-namespace --wait --timeout 5m; \
 		echo "✅ cert-manager installed!"; \
 		echo "⏳ Waiting for cert-manager webhook to be ready..."; \
@@ -445,7 +449,7 @@ helm-install-infra:
 	@echo "📦 Installing infrastructure (ENV=$(ENV), NS=$(K8S_NAMESPACE))..."
 	helm install wealist-infrastructure ./helm/charts/wealist-infrastructure \
 		-f $(HELM_BASE_VALUES) \
-		-f $(HELM_ENV_VALUES) \
+		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		-n $(K8S_NAMESPACE) --create-namespace
 	@echo "✅ Infrastructure installed!"
 
@@ -455,7 +459,7 @@ helm-install-services:
 		echo "Installing $$service..."; \
 		helm install $$service ./helm/charts/$$service \
 			-f $(HELM_BASE_VALUES) \
-			-f $(HELM_ENV_VALUES) \
+			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 			-n $(K8S_NAMESPACE); \
 	done
 	@echo "✅ All services installed!"
@@ -468,13 +472,13 @@ helm-upgrade-all:
 	@echo "🔄 Upgrading all charts (ENV=$(ENV), NS=$(K8S_NAMESPACE))..."
 	@helm upgrade wealist-infrastructure ./helm/charts/wealist-infrastructure \
 		-f $(HELM_BASE_VALUES) \
-		-f $(HELM_ENV_VALUES) \
+		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		-n $(K8S_NAMESPACE)
 	@for service in $(SERVICES); do \
 		echo "Upgrading $$service..."; \
 		helm upgrade $$service ./helm/charts/$$service \
 			-f $(HELM_BASE_VALUES) \
-			-f $(HELM_ENV_VALUES) \
+			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 			-n $(K8S_NAMESPACE); \
 	done
 	@echo "✅ All charts upgraded!"
