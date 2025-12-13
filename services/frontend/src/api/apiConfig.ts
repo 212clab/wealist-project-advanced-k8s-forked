@@ -5,6 +5,7 @@ declare global {
   interface Window {
     __ENV__?: {
       API_BASE_URL?: string;
+      API_DOMAIN?: string; // Direct API domain for WebSocket/SSE (bypasses CloudFront)
     };
   }
 }
@@ -340,6 +341,15 @@ const getWebSocketProtocol = (baseUrl?: string): 'wss:' | 'ws:' => {
 };
 
 /**
+ * API Domain 가져오기 (WebSocket/SSE용 - CloudFront 우회)
+ * CloudFront를 통한 WebSocket은 HTTP/2 프로토콜 충돌 등 이슈가 있어서
+ * 직접 API origin으로 연결해야 함
+ */
+const getApiDomain = (): string | null => {
+  return window.__ENV__?.API_DOMAIN || null;
+};
+
+/**
  * Chat WebSocket URL 생성
  * @param chatId - 채팅방 ID
  * @param token - 액세스 토큰
@@ -347,8 +357,15 @@ const getWebSocketProtocol = (baseUrl?: string): 'wss:' | 'ws:' => {
 export const getChatWebSocketUrl = (chatId: string, token: string): string => {
   const encodedToken = encodeURIComponent(token);
 
-  // K8s ingress 모드
+  // K8s ingress 모드 (CloudFront + API origin)
   if (isIngressMode) {
+    const apiDomain = getApiDomain();
+    // API_DOMAIN이 설정되어 있으면 CloudFront 우회하여 직접 연결
+    if (apiDomain) {
+      const protocol = getWebSocketProtocol();
+      return `${protocol}//${apiDomain}/api/chats/ws/${chatId}?token=${encodedToken}`;
+    }
+    // API_DOMAIN 없으면 CloudFront 통해 연결 시도 (fallback)
     const protocol = getWebSocketProtocol();
     return `${protocol}//${window.location.host}/svc/chat/api/chats/ws/${chatId}?token=${encodedToken}`;
   }
@@ -381,8 +398,15 @@ export const getChatWebSocketUrl = (chatId: string, token: string): string => {
 export const getPresenceWebSocketUrl = (token: string): string => {
   const encodedToken = encodeURIComponent(token);
 
-  // K8s ingress 모드
+  // K8s ingress 모드 (CloudFront + API origin)
   if (isIngressMode) {
+    const apiDomain = getApiDomain();
+    // API_DOMAIN이 설정되어 있으면 CloudFront 우회하여 직접 연결
+    if (apiDomain) {
+      const protocol = getWebSocketProtocol();
+      return `${protocol}//${apiDomain}/api/chats/ws/presence?token=${encodedToken}`;
+    }
+    // API_DOMAIN 없으면 CloudFront 통해 연결 시도 (fallback)
     const protocol = getWebSocketProtocol();
     return `${protocol}//${window.location.host}/svc/chat/api/chats/ws/presence?token=${encodedToken}`;
   }
@@ -416,8 +440,15 @@ export const getPresenceWebSocketUrl = (token: string): string => {
 export const getBoardWebSocketUrl = (projectId: string, token: string): string => {
   const encodedToken = encodeURIComponent(token);
 
-  // K8s ingress 모드
+  // K8s ingress 모드 (CloudFront + API origin)
   if (isIngressMode) {
+    const apiDomain = getApiDomain();
+    // API_DOMAIN이 설정되어 있으면 CloudFront 우회하여 직접 연결
+    if (apiDomain) {
+      const protocol = getWebSocketProtocol();
+      return `${protocol}//${apiDomain}/api/boards/ws/project/${projectId}?token=${encodedToken}`;
+    }
+    // API_DOMAIN 없으면 CloudFront 통해 연결 시도 (fallback)
     const protocol = getWebSocketProtocol();
     return `${protocol}//${window.location.host}/svc/board/api/boards/ws/project/${projectId}?token=${encodedToken}`;
   }
@@ -451,8 +482,15 @@ export const getNotificationSSEUrl = (token?: string): string => {
   const accessToken = token || localStorage.getItem('accessToken') || '';
   const encodedToken = encodeURIComponent(accessToken);
 
-  // K8s ingress 모드
+  // K8s ingress 모드 (CloudFront + API origin)
   if (isIngressMode) {
+    const apiDomain = getApiDomain();
+    // API_DOMAIN이 설정되어 있으면 CloudFront 우회하여 직접 연결
+    if (apiDomain) {
+      const protocol = window.location.protocol; // https: or http:
+      return `${protocol}//${apiDomain}/api/notifications/stream?token=${encodedToken}`;
+    }
+    // API_DOMAIN 없으면 CloudFront 통해 연결 시도 (fallback)
     return `${window.location.origin}/svc/noti/api/notifications/stream?token=${encodedToken}`;
   }
 

@@ -12,17 +12,27 @@
 #   AWS_CLOUDFRONT_DISTRIBUTION_ID
 #
 # Optional Secrets:
-#   VITE_API_BASE_URL (defaults to /svc)
+#   VITE_API_BASE_URL (defaults to empty string for ingress mode)
+#   API_DOMAIN (e.g., api.dev.wealist.co.kr - for WebSocket/SSE direct connection)
 
 name: Frontend Deploy
 
 on:
   push:
     branches:
-      - dev-frontend
+      - main
     paths:
       - "services/frontend/**"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
 
 env:
   NODE_VERSION: "20"
@@ -66,7 +76,18 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || '/svc' }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || '' }}
+
+      - name: Inject runtime config
+        run: |
+          # Inject API_DOMAIN for WebSocket/SSE direct connection (bypasses CloudFront)
+          if [ -n "${{ secrets.API_DOMAIN }}" ]; then
+            sed -i 's|API_DOMAIN: ""|API_DOMAIN: "${{ secrets.API_DOMAIN }}"|' dist/config.js
+            echo "Injected API_DOMAIN: ${{ secrets.API_DOMAIN }}"
+          else
+            echo "API_DOMAIN not set, WebSocket will use CloudFront (may have issues)"
+          fi
+          cat dist/config.js
 
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -103,4 +124,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **S3 Bucket**: ${{ secrets.AWS_S3_BUCKET }}" >> $GITHUB_STEP_SUMMARY
           echo "- **CloudFront**: Cache invalidated" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Domain**: ${{ secrets.API_DOMAIN || 'not set (using CloudFront)' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
