@@ -70,7 +70,10 @@ podSecurityContext:
 securityContext:
   allowPrivilegeEscalation: false
   runAsNonRoot: false
+  runAsUser: 0  # Required for nginx to run setgid
   readOnlyRootFilesystem: false
+  capabilities:
+    drop: []  # Override base.yaml's drop ALL - nginx needs SETGID
 
 # -----------------------------------------------------------------------------
 # Features Disabled for Development
