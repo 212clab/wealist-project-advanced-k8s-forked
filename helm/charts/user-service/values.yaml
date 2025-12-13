@@ -50,7 +50,7 @@ config:
   SERVER_BASE_PATH: "/api"
 
   # Database (service-specific database name)
-  DB_NAME: "wealist_user_db"
+  DB_NAME: "wealist_user_service_db"
 
   # Service-specific URLs (if any)
 
@@ -215,20 +215,13 @@ podAnnotations: {}
 # -----------------------------------------------------------------------------
 # Environment Variables
 # -----------------------------------------------------------------------------
-# Environment variable sources (ConfigMaps and Secrets)
-envFrom:
-  - configMapRef:
-      name: wealist-shared-config
-  - configMapRef:
-      name: user-service-config
-  - secretRef:
-      name: wealist-shared-secrets
+# Note: envFrom is automatically configured in wealist-common deployment template
+# to use {service}-config ConfigMap. Additional env vars can be added below.
 
-# Additional environment variables
-env:
-  - name: DATABASE_URL
-    value: "postgresql://user_service:user_service_password@postgres:5432/wealist_user_db?sslmode=disable"
-  # Add more env vars as needed
+# Additional environment variables (optional)
+env: []
+  # - name: CUSTOM_VAR
+  #   value: "custom-value"
 
 # -----------------------------------------------------------------------------
 # Pod Disruption Budget (for high availability)

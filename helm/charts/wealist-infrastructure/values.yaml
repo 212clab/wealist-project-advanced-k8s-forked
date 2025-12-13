@@ -37,23 +37,24 @@ postgres:
     superuserPassword: "postgres"  # Override in production
 
     # Database list (init script creates these)
+    # Note: DB names must match service config (DB_NAME in charts/*/values.yaml)
     databases:
-      - name: wealist_user_db
+      - name: wealist_user_service_db
         user: user_service
         password: user_service_password
-      - name: wealist_board_db
+      - name: wealist_board_service_db
         user: board_service
         password: board_service_password
-      - name: wealist_chat_db
+      - name: wealist_chat_service_db
         user: chat_service
         password: chat_service_password
-      - name: wealist_noti_db
+      - name: wealist_noti_service_db
         user: noti_service
         password: noti_service_password
-      - name: wealist_storage_db
+      - name: wealist_storage_service_db
         user: storage_service
         password: storage_service_password
-      - name: wealist_video_db
+      - name: wealist_video_service_db
         user: video_service
         password: video_service_password
 

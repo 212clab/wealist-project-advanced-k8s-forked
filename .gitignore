@@ -122,3 +122,7 @@ helm/charts/**/values-prod.yaml
 helm/charts/**/values-production.yaml
 helm/charts/**/secrets.yaml
 !helm/**/*.example
+
+# Helm - 패키지된 dependency charts (helm dependency update로 생성)
+helm/charts/**/charts/*.tgz
+helm/charts/**/*.lock
