@@ -21,7 +21,7 @@ make kind-load-images
 
 # 3. 배포
 make kind-apply                                   # 기본: local.wealist.co.kr
-make kind-apply LOCAL_DOMAIN=dev.wealist.co.kr  # 커스텀 도메인
+make kind-apply LOCAL_DOMAIN=api.dev.wealist.co.kr  # 커스텀 도메인
 ```
 
 > 자세한 내용은 [NOTE.md](./NOTE.md) 참고

@@ -42,14 +42,14 @@ make kind-load-images
 
 # 3. 배포 (도메인 선택)
 make kind-apply                                   # 기본: local.wealist.co.kr
-make kind-apply LOCAL_DOMAIN=dev.wealist.co.kr  # 커스텀 도메인
+make kind-apply LOCAL_DOMAIN=api.dev.wealist.co.kr  # 커스텀 도메인
 ```
 
 ### 예시: dev.wealist.co.kr로 배포
 
 ```bash
 # CNAME/A 레코드 등록 후 아래 명령어 실행
-make kind-apply LOCAL_DOMAIN=dev.wealist.co.kr
+make kind-apply LOCAL_DOMAIN=api.dev.wealist.co.kr
 
 # 접속: http://dev.wealist.co.kr (CDN 사용 시 https)
 ```

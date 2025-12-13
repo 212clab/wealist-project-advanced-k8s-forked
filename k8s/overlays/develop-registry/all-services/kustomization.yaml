@@ -6,7 +6,7 @@
 #
 # 사용법:
 #   make kind-apply                              # 기본: local.wealist.co.kr
-#   make kind-apply LOCAL_DOMAIN=dev.wealist.co.kr  # 커스텀 도메인
+#   make kind-apply LOCAL_DOMAIN=api.dev.wealist.co.kr  # 커스텀 도메인
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
