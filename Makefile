@@ -81,7 +81,7 @@ kind-load-images:
 	@echo "✅ All images loaded!"
 	@echo ""
 	@echo "Next: make kind-apply"
-	@echo "  (Or: make kind-apply LOCAL_DOMAIN=api.dev.wealist.co.kr)"
+	@echo "  (Or: make kind-apply LOCAL_DOMAIN=dev.wealist.co.kr)"
 
 # Step 3: Deploy all to k8s
 kind-apply:
