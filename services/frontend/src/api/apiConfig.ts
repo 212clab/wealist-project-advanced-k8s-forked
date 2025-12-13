@@ -489,7 +489,7 @@ export const getOAuthBaseUrl = (): string => {
     return '';
   }
 
-  // Docker-compose (로컬 개발): auth-service 8080 포트
+  // Docker-compose (로컬 개발): auth-service 8080 포트!
   if (INJECTED_API_BASE_URL?.includes('localhost')) {
     return `${INJECTED_API_BASE_URL}:8080`;
   }
