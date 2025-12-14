@@ -1,5 +1,6 @@
-.PHONY: help dev-up dev-down dev-logs kind-setup kind-load-images kind-apply kind-delete status clean
+.PHONY: help dev-up dev-down dev-logs kind-setup kind-load-images kind-apply kind-delete kind-recover init-local-db status clean
 .PHONY: local-kind-apply local-tls-secret
+.PHONY: helm-deps-build
 .PHONY: sonar-up sonar-down sonar-logs sonar-status sonar-restart sonar-clean
 .PHONY: auth-service-build auth-service-load auth-service-redeploy auth-service-all
 .PHONY: board-service-build board-service-load board-service-redeploy board-service-all
@@ -54,6 +55,8 @@ help:
 	@echo "    make kind-load-images - 2. Build/pull all images (infra + services)"
 	@echo "    make kind-apply       - 3. Deploy all to k8s (localhost)"
 	@echo "    make kind-delete      - Delete cluster"
+	@echo "    make kind-recover     - Recover cluster after reboot"
+	@echo "    make init-local-db    - Init local PostgreSQL/Redis (Ubuntu, ENV=local-ubuntu)"
 	@echo ""
 	@echo "  Kubernetes (Local - local.wealist.co.kr):"
 	@echo "    make local-kind-apply - Deploy with local.wealist.co.kr domain"
@@ -70,11 +73,13 @@ help:
 	@echo "    noti-service, storage-service, user-service, video-service"
 	@echo ""
 	@echo "  Helm Charts (Recommended):"
-	@echo "    make helm-lint           - Lint all Helm charts"
-	@echo "    make helm-install-all    - Install cert-manager + infrastructure + services"
-	@echo "    make helm-upgrade-all    - Upgrade all charts"
-	@echo "    make helm-uninstall-all  - Uninstall all charts"
-	@echo "    make helm-validate       - Run comprehensive validation"
+	@echo "    make helm-deps-build      - Build all Helm dependencies"
+	@echo "    make helm-lint            - Lint all Helm charts"
+	@echo "    make helm-install-all-init - Install all (with DB migration, 최초 1회)"
+	@echo "    make helm-install-all     - Install all (without DB migration)"
+	@echo "    make helm-upgrade-all     - Upgrade all charts"
+	@echo "    make helm-uninstall-all   - Uninstall all charts"
+	@echo "    make helm-validate        - Run comprehensive validation"
 	@echo ""
 	@echo "  TLS/cert-manager:"
 	@echo "    make helm-install-cert-manager  - Install cert-manager only"
@@ -183,6 +188,37 @@ kind-apply:
 kind-delete:
 	kind delete cluster --name $(KIND_CLUSTER)
 	@docker rm -f kind-registry 2>/dev/null || true
+
+# Kind 클러스터 복구 (재부팅 후)
+kind-recover:
+	@echo "🔄 Recovering Kind cluster..."
+	@docker restart $(KIND_CLUSTER)-control-plane $(KIND_CLUSTER)-worker $(KIND_CLUSTER)-worker2 kind-registry 2>/dev/null || true
+	@sleep 30
+	@kind export kubeconfig --name $(KIND_CLUSTER)
+	@echo "⏳ Waiting for API server..."
+	@until kubectl get nodes >/dev/null 2>&1; do sleep 5; done
+	@echo "✅ Cluster recovered!"
+	@kubectl get nodes
+
+# Initialize local Ubuntu PostgreSQL and Redis for external DB connection
+# Run this ONCE on Ubuntu host before deploying with ENV=local-ubuntu
+init-local-db:
+	@echo "🔧 Initializing local PostgreSQL and Redis for Wealist..."
+	@echo ""
+	@echo "This will configure your local PostgreSQL and Redis to accept"
+	@echo "connections from the Kind cluster (Docker network)."
+	@echo ""
+	@echo "Prerequisites:"
+	@echo "  - PostgreSQL installed: sudo apt install postgresql postgresql-contrib"
+	@echo "  - Redis installed: sudo apt install redis-server"
+	@echo ""
+	@echo "Running scripts with sudo..."
+	@sudo ./scripts/init-local-postgres.sh
+	@sudo ./scripts/init-local-redis.sh
+	@echo ""
+	@echo "✅ Local database initialization complete!"
+	@echo ""
+	@echo "Next: make helm-install-all ENV=local-ubuntu"
 
 # =============================================================================
 # Kubernetes (Local - local.wealist.co.kr)
@@ -386,7 +422,7 @@ clean:
 # Helm Charts
 # =============================================================================
 
-.PHONY: helm-lint helm-install-cert-manager helm-install-infra helm-install-services helm-install-all
+.PHONY: helm-lint helm-install-cert-manager helm-install-infra helm-install-services helm-install-all helm-install-all-init
 .PHONY: helm-upgrade-all helm-uninstall-all helm-validate
 .PHONY: helm-local-kind helm-local-ubuntu helm-dev helm-staging helm-prod
 .PHONY: helm-setup-route53-secret
@@ -400,6 +436,18 @@ HELM_SECRETS_VALUES = ./helm/environments/$(ENV)-secrets.yaml
 HELM_SECRETS_FLAG = $(shell test -f $(HELM_SECRETS_VALUES) && echo "-f $(HELM_SECRETS_VALUES)")
 
 SERVICES = auth-service user-service board-service chat-service noti-service storage-service video-service frontend
+
+# Helm 의존성 전체 빌드
+helm-deps-build:
+	@echo "📦 Building all Helm dependencies..."
+	@helm dependency update ./helm/charts/wealist-common 2>/dev/null || true
+	@for chart in $(SERVICES); do \
+		echo "Updating $$chart dependencies..."; \
+		helm dependency update ./helm/charts/$$chart; \
+	done
+	@helm dependency update ./helm/charts/wealist-infrastructure
+	@helm dependency update ./helm/charts/cert-manager-config 2>/dev/null || true
+	@echo "✅ All dependencies built!"
 
 helm-lint:
 	@echo "🔍 Linting all Helm charts..."
@@ -467,6 +515,20 @@ helm-install-services:
 helm-install-all: helm-install-cert-manager helm-install-infra
 	@sleep 5
 	@$(MAKE) helm-install-services ENV=$(ENV)
+
+# 최초 설치 (DB 마이그레이션 포함)
+helm-install-all-init: helm-install-cert-manager helm-install-infra
+	@sleep 5
+	@echo "📦 Installing services with DB migration enabled (initial setup)..."
+	@for service in $(SERVICES); do \
+		echo "Installing $$service with DB migration..."; \
+		helm install $$service ./helm/charts/$$service \
+			-f $(HELM_BASE_VALUES) \
+			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
+			--set shared.config.DB_AUTO_MIGRATE=true \
+			-n $(K8S_NAMESPACE); \
+	done
+	@echo "✅ Initial setup complete! Future deploys will skip DB migration."
 
 helm-upgrade-all:
 	@echo "🔄 Upgrading all charts (ENV=$(ENV), NS=$(K8S_NAMESPACE))..."
