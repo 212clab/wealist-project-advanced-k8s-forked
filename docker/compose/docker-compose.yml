@@ -542,6 +542,7 @@ services:
       - PORT=8003
       - STORAGE_SERVICE_PORT=8003
       - LOG_LEVEL=debug
+      - DB_AUTO_MIGRATE=true
 
       # Database Configuration
       - DATABASE_URL=postgresql://${STORAGE_DB_USER}:${STORAGE_DB_PASSWORD}@postgres:5432/${STORAGE_DB_NAME}?sslmode=disable
@@ -617,6 +618,7 @@ services:
       - PORT=8004
       - SERVER_BASE_PATH=/api/video
       - LOG_LEVEL=debug
+      - DB_AUTO_MIGRATE=true
 
       # Database Configuration
       - DATABASE_URL=postgresql://${VIDEO_DB_USER}:${VIDEO_DB_PASSWORD}@postgres:5432/${VIDEO_DB_NAME}?sslmode=disable
