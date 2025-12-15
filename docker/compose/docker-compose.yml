@@ -536,40 +536,11 @@ services:
     ports:
       - "7880:7880" # HTTP API & WebSocket
       - "7881:7881" # TCP for WebRTC
-      - "50000-50020:50000-50020/udp" # UDP for WebRTC media (limited range for dev)
 
     command: --config /etc/livekit.yaml
 
     volumes:
       - ../livekit/livekit.yaml:/etc/livekit.yaml:ro
-
-    networks:
-      - frontend-net
-      - backend-net
-
-    restart: unless-stopped
-
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # coturn TURN/STUN Server - NAT Traversal
-  coturn:
-    image: coturn/coturn:4.6
-    container_name: wealist-coturn
-    hostname: coturn
-    ports:
-      - "3478:3478" # STUN/TURN UDP
-      - "3478:3478/udp" # STUN/TURN UDP
-      - "5349:5349" # STUN/TURN TLS
-      - "5349:5349/udp" # STUN/TURN TLS UDP
-
-    volumes:
-      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-
-    command: -c /etc/coturn/turnserver.conf
 
     networks:
       - frontend-net
@@ -1071,7 +1042,14 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/api/system/status"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--spider",
+          "http://localhost:9000/api/system/status",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
