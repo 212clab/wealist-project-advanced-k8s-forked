@@ -11,7 +11,7 @@ global:
   namespace: wealist-kind-local
   environment: local
   domain: localhost
-  imageRegistry: wealist-dev
+  imageRegistry: localhost:5001
 
 # -----------------------------------------------------------------------------
 # cert-manager Configuration (Disabled for localhost)
