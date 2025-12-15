@@ -17,8 +17,8 @@ services:
   # User Service (Go)
   user-service:
     build:
-      context: ../../services/user-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/user-service/docker/Dockerfile
     image: wealist/user-service:${VERSION:-latest}
     container_name: wealist-user-service
     hostname: user-service
@@ -33,6 +33,7 @@ services:
       - SERVER_PORT=8081
       - USER_SERVICE_PORT=8081
       - LOG_LEVEL=debug
+      - DB_AUTO_MIGRATE=true
 
       # Database Configuration
       - DATABASE_URL=postgresql://${USER_DB_USER}:${USER_DB_PASSWORD}@postgres:5432/${USER_DB_NAME}?sslmode=disable
@@ -163,8 +164,8 @@ services:
   # Board Service (Go)
   board-service:
     build:
-      context: ../../services/board-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/board-service/docker/Dockerfile
     image: wealist/board-service:${VERSION:-latest}
     container_name: wealist-board-service
     hostname: board-service
@@ -248,8 +249,8 @@ services:
   # Chat Service (Go)
   chat-service:
     build:
-      context: ../../services/chat-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/chat-service/docker/Dockerfile
     image: wealist/chat-service:${VERSION:-latest}
     container_name: wealist-chat-service
     hostname: chat-service
@@ -310,8 +311,8 @@ services:
   # Notification Service (Go)
   noti-service:
     build:
-      context: ../../services/noti-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/noti-service/docker/Dockerfile
     image: wealist/noti-service:${VERSION:-latest}
     container_name: wealist-noti-service
     hostname: noti-service
@@ -379,8 +380,8 @@ services:
   # Storage Service (Go) - Google Drive like storage
   storage-service:
     build:
-      context: ../../services/storage-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/storage-service/docker/Dockerfile
     image: wealist/storage-service:${VERSION:-latest}
     container_name: wealist-storage-service
     hostname: storage-service
@@ -454,8 +455,8 @@ services:
   # Video Service (Go) - Video Call Room Management
   video-service:
     build:
-      context: ../../services/video-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/video-service/docker/Dockerfile
     image: wealist/video-service:${VERSION:-latest}
     container_name: wealist-video-service
     hostname: video-service
@@ -540,40 +541,11 @@ services:
     ports:
       - "7880:7880" # HTTP API & WebSocket
       - "7881:7881" # TCP for WebRTC
-      - "50000-50020:50000-50020/udp" # UDP for WebRTC media (limited range for dev)
 
     command: --config /etc/livekit.yaml
 
     volumes:
       - ../livekit/livekit.yaml:/etc/livekit.yaml:ro
-
-    networks:
-      - frontend-net
-      - backend-net
-
-    restart: unless-stopped
-
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # coturn TURN/STUN Server - NAT Traversal
-  coturn:
-    image: coturn/coturn:4.6
-    container_name: wealist-coturn
-    hostname: coturn
-    ports:
-      - "3478:3478" # STUN/TURN UDP
-      - "3478:3478/udp" # STUN/TURN UDP
-      - "5349:5349" # STUN/TURN TLS
-      - "5349:5349/udp" # STUN/TURN TLS UDP
-
-    volumes:
-      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-
-    command: -c /etc/coturn/turnserver.conf
 
     networks:
       - frontend-net
@@ -1052,7 +1024,7 @@ services:
     container_name: wealist-sonarqube
     hostname: sonarqube
     ports:
-      - "${SONARQUBE_PORT:-9000}:9000"
+      - "${SONARQUBE_PORT:-9002}:9000"
 
     environment:
       - SONAR_JDBC_URL=jdbc:postgresql://postgres:5432/${SONARQUBE_DB_NAME}
@@ -1075,7 +1047,14 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/api/system/status"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--spider",
+          "http://localhost:9000/api/system/status",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
