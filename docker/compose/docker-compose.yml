@@ -319,7 +319,7 @@ services:
       - ENV=dev
       - BOARD_SERVER_PORT=8000
       - LOG_LEVEL=debug
-      - BOARD_USE_AUTO_MIGRATE=true
+      - DB_AUTO_MIGRATE=true
 
       # Database Configuration
       - DATABASE_URL=postgresql://${BOARD_DB_USER}:${BOARD_DB_PASSWORD}@postgres:5432/${BOARD_DB_NAME}?sslmode=disable
