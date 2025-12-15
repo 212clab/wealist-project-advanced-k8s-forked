@@ -19,6 +19,7 @@ make kind-load-images
 
 # 1-3. Secrets 설정 (필수!)
 cp helm/environments/secrets.example.yaml helm/environments/local-kind-secrets.yaml
+cp helm/environments/local-kind-secrets.yaml helm/environments/dev-secrets.yaml(환경별)
 
 # 파일 편집하여 Google OAuth 자격증명 입력 (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 # 1-4. Helm으로 전체 배포
