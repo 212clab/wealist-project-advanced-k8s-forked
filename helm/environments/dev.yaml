@@ -15,6 +15,23 @@ global:
   imageRegistry: localhost:5001
 
 # -----------------------------------------------------------------------------
+# cert-manager Configuration (TLS with Let's Encrypt)
+# -----------------------------------------------------------------------------
+certManager:
+  enabled: true
+  installCertManager: true
+
+  issuer:
+    name: letsencrypt-prod
+    email: ressk4149@gmail.com
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+
+  solver:
+    type: http01
+    http01:
+      ingressClass: nginx
+
+# -----------------------------------------------------------------------------
 # Deployment Settings
 # -----------------------------------------------------------------------------
 replicaCount: 1
@@ -90,6 +107,9 @@ shared:
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   hosts:
     - host: dev.wealist.co.kr
     - host: api.dev.wealist.co.kr  # API subdomain for frontend
