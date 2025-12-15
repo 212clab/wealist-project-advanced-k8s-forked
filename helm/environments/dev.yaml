@@ -11,7 +11,7 @@ global:
   namespace: wealist-dev
   environment: development
   domain: dev.wealist.co.kr
-  imageRegistry: ghcr.io/orangescloud
+  imageRegistry: ghcr.io/212clab
 
 # -----------------------------------------------------------------------------
 # Deployment Settings
