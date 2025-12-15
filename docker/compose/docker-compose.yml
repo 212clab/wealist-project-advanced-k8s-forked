@@ -17,8 +17,8 @@ services:
   # User Service (Go)
   user-service:
     build:
-      context: ../../services/user-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/user-service/docker/Dockerfile
     image: wealist/user-service:${VERSION:-latest}
     container_name: wealist-user-service
     hostname: user-service
@@ -163,8 +163,8 @@ services:
   # Board Service (Go)
   board-service:
     build:
-      context: ../../services/board-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/board-service/docker/Dockerfile
     image: wealist/board-service:${VERSION:-latest}
     container_name: wealist-board-service
     hostname: board-service
@@ -248,8 +248,8 @@ services:
   # Chat Service (Go)
   chat-service:
     build:
-      context: ../../services/chat-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/chat-service/docker/Dockerfile
     image: wealist/chat-service:${VERSION:-latest}
     container_name: wealist-chat-service
     hostname: chat-service
@@ -308,8 +308,8 @@ services:
   # Notification Service (Go)
   noti-service:
     build:
-      context: ../../services/noti-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/noti-service/docker/Dockerfile
     image: wealist/noti-service:${VERSION:-latest}
     container_name: wealist-noti-service
     hostname: noti-service
@@ -375,8 +375,8 @@ services:
   # Storage Service (Go) - Google Drive like storage
   storage-service:
     build:
-      context: ../../services/storage-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/storage-service/docker/Dockerfile
     image: wealist/storage-service:${VERSION:-latest}
     container_name: wealist-storage-service
     hostname: storage-service
@@ -450,8 +450,8 @@ services:
   # Video Service (Go) - Video Call Room Management
   video-service:
     build:
-      context: ../../services/video-service
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: services/video-service/docker/Dockerfile
     image: wealist/video-service:${VERSION:-latest}
     container_name: wealist-video-service
     hostname: video-service
