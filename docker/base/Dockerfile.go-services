@@ -54,6 +54,17 @@ COPY services/storage-service/ ./services/storage-service/
 COPY services/user-service/ ./services/user-service/
 COPY services/video-service/ ./services/video-service/
 
+# Re-add replace directives (소스 복사로 덮어써졌으므로)
+RUN for dir in services/*/; do \
+    echo 'replace github.com/OrangesCloud/wealist-advanced-go-pkg => ../../packages/wealist-advanced-go-pkg' >> "${dir}go.mod"; \
+    done
+
+# go mod tidy for each service
+RUN --mount=type=cache,target=/go/pkg/mod \
+    for dir in services/*/; do \
+    cd /workspace/${dir} && GOWORK=off go mod tidy; \
+    done
+
 # Build all services (shared package 컴파일은 캐시됨)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
