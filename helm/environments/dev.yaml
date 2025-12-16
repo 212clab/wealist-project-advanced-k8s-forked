@@ -104,11 +104,7 @@ ingress:
   annotations:
     # No cert-manager - CloudFront handles SSL
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    # Force HTTPS in X-Forwarded-Proto for OAuth redirects
-    nginx.ingress.kubernetes.io/proxy-set-headers: "ingress-nginx/custom-headers"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-Proto https;
-      proxy_set_header X-Forwarded-Host $host;
+    # CloudFront with AllViewer policy forwards X-Forwarded-* headers
   hosts:
     # Main domain (CloudFront forwards with this Host header)
     - host: dev.wealist.co.kr
