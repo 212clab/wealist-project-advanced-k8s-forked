@@ -105,7 +105,9 @@ ingress:
     # No cert-manager - CloudFront handles SSL
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    # API endpoint (CloudFront forwards to wonnyhome.myddns.me)
+    # Main domain (CloudFront forwards with this Host header)
+    - host: dev.wealist.co.kr
+    # API endpoint
     - host: api.dev.wealist.co.kr
     # DDNS hostname for direct access (No-IP)
     - host: wonnyhome.myddns.me
