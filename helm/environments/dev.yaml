@@ -15,21 +15,11 @@ global:
   imageRegistry: localhost:5001
 
 # -----------------------------------------------------------------------------
-# cert-manager Configuration (TLS with Let's Encrypt)
+# cert-manager Configuration (Disabled - CloudFront handles SSL termination)
 # -----------------------------------------------------------------------------
 certManager:
-  enabled: true
-  installCertManager: true
-
-  issuer:
-    name: letsencrypt-prod
-    email: ressk4149@gmail.com
-    server: "https://acme-v02.api.letsencrypt.org/directory"
-
-  solver:
-    type: http01
-    http01:
-      ingressClass: nginx
+  enabled: false
+  # Note: SSL is handled by CloudFront, K8s receives HTTP only
 
 # -----------------------------------------------------------------------------
 # Deployment Settings
@@ -104,19 +94,20 @@ shared:
     OAUTH2_REDIRECT_URL_ENV: "https://dev.wealist.co.kr/oauth/callback"
 
 # -----------------------------------------------------------------------------
-# Ingress
+# Ingress (HTTP only - CloudFront handles SSL termination)
 # -----------------------------------------------------------------------------
 ingress:
   enabled: true
   className: nginx
+  # Frontend is served via S3/CloudFront, not K8s
+  includeFrontend: false
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # No cert-manager - CloudFront handles SSL
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - host: dev.wealist.co.kr
-    - host: api.dev.wealist.co.kr  # API subdomain for frontend
-  tls:
-    - secretName: dev-wealist-tls
-      hosts:
-        - dev.wealist.co.kr
-        - api.dev.wealist.co.kr
+    # API endpoint (CloudFront forwards to wonnyhome.ddns.co.kr)
+    - host: api.dev.wealist.co.kr
+    # DDNS hostname for direct access
+    - host: wonnyhome.ddns.co.kr
+  # No TLS - CloudFront handles SSL termination
+  tls: []
