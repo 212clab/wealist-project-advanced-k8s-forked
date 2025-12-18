@@ -6,16 +6,16 @@ metadata:
 spec:
   project: wealist
   source:
-    repoURL: https://github.com/your-org/wealist-project-advanced.git
+    repoURL: https://github.com/OrangesCloud/wealist-argo-helm.git 
     targetRevision: main
-    path: helm/charts/wealist-infrastructure
+    path: main/helm/charts/wealist-infrastructure
     helm:
       valueFiles:
         - values.yaml
-        - values-develop-registry-local.yaml
+        # - values-develop-registry-local.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: wealist-dev
+    namespace: wealist-kind-local
   syncPolicy:
     automated:
       prune: true

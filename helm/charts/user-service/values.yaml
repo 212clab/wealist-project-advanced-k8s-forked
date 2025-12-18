@@ -18,7 +18,7 @@ imagePullSecrets: []
 # -----------------------------------------------------------------------------
 # Deployment Configuration
 # -----------------------------------------------------------------------------
-replicaCount: 2  # Production default (high availability)
+replicaCount: 1  # 기본값 1개 (환경별로 오버라이드 가능)
 
 # Deployment strategy
 strategy:

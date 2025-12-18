@@ -13,10 +13,10 @@ metadata:
   labels:
     {{- include "wealist-common.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling }}
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount | default 1 }}
-  {{- end }}
+  {{- $serviceName := include "wealist-common.name" . }}
+  {{- $serviceReplicaCount := index .Values $serviceName "replicaCount" | default .Values.replicaCount | default 1 }}
+  replicas: {{ $serviceReplicaCount }}
   {{- end }}
   selector:
     matchLabels:

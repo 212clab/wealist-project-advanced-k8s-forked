@@ -6,19 +6,21 @@ metadata:
 spec:
   project: wealist
   source:
-    repoURL: https://github.com/your-org/wealist-project-advanced.git
+    repoURL: https://github.com/OrangesCloud/wealist-argo-helm.git 
     targetRevision: main
-    path: helm/charts/chat-service
+    path: main/helm/charts/chat-service
     helm:
       valueFiles:
         - values.yaml
-        - values-develop-registry-local.yaml
+        - ../../environments/local-kind.yaml
       parameters:
         - name: image.tag
           value: "latest"
+        - name: global.imageRegistry
+          value: "localhost:5001"
   destination:
     server: https://kubernetes.default.svc
-    namespace: wealist-dev
+    namespace: wealist-kind-local
   syncPolicy:
     automated:
       prune: true

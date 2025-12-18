@@ -19,7 +19,7 @@ imagePullSecrets: []
 # -----------------------------------------------------------------------------
 # Deployment Configuration
 # -----------------------------------------------------------------------------
-replicaCount: 2  # Minimum 2 for high availability
+replicaCount: 1  # 기본 설정은 1 local-kind에서도 변경 가능
 
 # Update strategy
 strategy:
