@@ -18,13 +18,13 @@ import (
 
 // Config holds router configuration
 type Config struct {
-	DB         *gorm.DB
-	Logger     *zap.Logger
-	JWTSecret  string
-	BasePath   string
-	S3Client   *client.S3Client
-	AuthClient *client.AuthClient
-	Metrics    *metrics.Metrics
+	DB             *gorm.DB
+	Logger         *zap.Logger
+	JWTSecret      string
+	BasePath       string
+	S3Client       *client.S3Client
+	TokenValidator middleware.TokenValidator // 공통 모듈의 TokenValidator 인터페이스 사용
+	Metrics        *metrics.Metrics
 }
 
 // Setup sets up the router with all routes
@@ -84,8 +84,8 @@ func Setup(cfg Config) *gin.Engine {
 
 	// Auth middleware - use auth-service validator if available, otherwise use local JWT
 	var authMiddleware gin.HandlerFunc
-	if cfg.AuthClient != nil {
-		authMiddleware = middleware.AuthWithValidator(cfg.AuthClient)
+	if cfg.TokenValidator != nil {
+		authMiddleware = middleware.AuthWithValidator(cfg.TokenValidator)
 	} else {
 		authMiddleware = middleware.Auth(cfg.JWTSecret)
 	}

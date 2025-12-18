@@ -1,9 +1,9 @@
-// Package service implements business logic for video-service.
+// Package service는 video-service의 비즈니스 로직을 구현합니다.
 //
-// This package provides the RoomService interface and implementation
-// for managing video call rooms, participants, call history, and transcripts.
-// It integrates with LiveKit for WebRTC functionality and validates
-// workspace membership through the user-service.
+// 이 패키지는 비디오 통화 룸, 참가자, 통화 기록 및 트랜스크립트 관리를 위한
+// RoomService 인터페이스와 구현을 제공합니다.
+// LiveKit과 통합하여 WebRTC 기능을 제공하고,
+// user-service를 통해 워크스페이스 멤버십을 검증합니다.
 package service
 
 import (
@@ -24,72 +24,70 @@ import (
 	"go.uber.org/zap"
 )
 
-// Service-level errors for room operations.
-// These errors are used to communicate specific failure conditions
-// to handlers for appropriate HTTP response mapping.
+// 서비스 레벨 에러 정의
+// 이 에러들은 핸들러에서 적절한 HTTP 응답을 매핑하기 위해 사용됩니다.
 var (
-	// ErrRoomNotFound indicates the requested room does not exist.
+	// ErrRoomNotFound는 요청한 룸이 존재하지 않음을 나타냅니다.
 	ErrRoomNotFound = errors.New("room not found")
-	// ErrRoomFull indicates the room has reached its maximum participant capacity.
+	// ErrRoomFull은 룸이 최대 참가자 수에 도달했음을 나타냅니다.
 	ErrRoomFull = errors.New("room is full")
-	// ErrAlreadyInRoom indicates the user is already a participant in the room.
+	// ErrAlreadyInRoom은 사용자가 이미 룸에 참가 중임을 나타냅니다.
 	ErrAlreadyInRoom = errors.New("user is already in room")
-	// ErrNotInRoom indicates the user is not a participant in the room.
+	// ErrNotInRoom은 사용자가 룸에 참가하지 않았음을 나타냅니다.
 	ErrNotInRoom = errors.New("user is not in room")
-	// ErrRoomNotActive indicates the room has ended and is no longer accepting participants.
+	// ErrRoomNotActive는 룸이 종료되어 더 이상 참가자를 받지 않음을 나타냅니다.
 	ErrRoomNotActive = errors.New("room is not active")
-	// ErrNotWorkspaceMember indicates the user is not authorized to access the workspace.
+	// ErrNotWorkspaceMember는 사용자가 워크스페이스에 접근 권한이 없음을 나타냅니다.
 	ErrNotWorkspaceMember = errors.New("user is not a member of this workspace")
 )
 
-// RoomService defines the interface for video room business operations.
-// It provides methods for room lifecycle management, participant tracking,
-// call history retrieval, and transcript storage.
+// RoomService는 비디오 룸 비즈니스 로직을 위한 인터페이스입니다.
+// 룸 생명주기 관리, 참가자 추적, 통화 기록 조회 및 트랜스크립트 저장 메서드를 제공합니다.
 type RoomService interface {
-	// CreateRoom creates a new video call room in the specified workspace.
-	// It validates workspace membership and initializes a LiveKit room.
+	// CreateRoom은 지정된 워크스페이스에 새 비디오 통화 룸을 생성합니다.
+	// 워크스페이스 멤버십을 검증하고 LiveKit 룸을 초기화합니다.
 	CreateRoom(ctx context.Context, req *domain.CreateRoomRequest, creatorID uuid.UUID, token string) (*domain.RoomResponse, error)
 
-	// GetRoom retrieves a single room by its ID.
+	// GetRoom은 ID로 단일 룸을 조회합니다.
 	GetRoom(ctx context.Context, roomID uuid.UUID) (*domain.RoomResponse, error)
 
-	// GetWorkspaceRooms retrieves all rooms for a workspace.
-	// Set activeOnly to true to filter for only active rooms.
+	// GetWorkspaceRooms는 워크스페이스의 모든 룸을 조회합니다.
+	// activeOnly를 true로 설정하면 활성 룸만 필터링합니다.
 	GetWorkspaceRooms(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID, token string, activeOnly bool) ([]domain.RoomResponse, error)
 
-	// JoinRoom adds a user to a room and returns a LiveKit access token.
-	// Returns ErrRoomFull if the room has reached capacity.
+	// JoinRoom은 사용자를 룸에 추가하고 LiveKit 액세스 토큰을 반환합니다.
+	// 룸이 가득 찬 경우 ErrRoomFull을 반환합니다.
 	JoinRoom(ctx context.Context, roomID, userID uuid.UUID, userName string, token string) (*domain.JoinRoomResponse, error)
 
-	// LeaveRoom removes a user from a room.
-	// If the creator leaves, the room is automatically ended.
+	// LeaveRoom은 사용자를 룸에서 제거합니다.
+	// 생성자가 나가면 룸이 자동으로 종료됩니다.
 	LeaveRoom(ctx context.Context, roomID, userID uuid.UUID) error
 
-	// EndRoom closes a room and creates a call history record.
-	// Only the room creator can end the room.
+	// EndRoom은 룸을 닫고 통화 기록을 생성합니다.
+	// 룸 생성자만 룸을 종료할 수 있습니다.
 	EndRoom(ctx context.Context, roomID, userID uuid.UUID) error
 
-	// GetParticipants returns all active participants in a room.
+	// GetParticipants는 룸의 모든 활성 참가자를 반환합니다.
 	GetParticipants(ctx context.Context, roomID uuid.UUID) ([]domain.ParticipantResponse, error)
 
-	// GetWorkspaceCallHistory returns paginated call history for a workspace.
+	// GetWorkspaceCallHistory는 워크스페이스의 페이지네이션된 통화 기록을 반환합니다.
 	GetWorkspaceCallHistory(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID, token string, limit, offset int) ([]domain.CallHistoryResponse, int64, error)
 
-	// GetUserCallHistory returns paginated call history for a specific user.
+	// GetUserCallHistory는 특정 사용자의 페이지네이션된 통화 기록을 반환합니다.
 	GetUserCallHistory(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.CallHistoryResponse, int64, error)
 
-	// GetCallHistoryByID retrieves a single call history record by ID.
+	// GetCallHistoryByID는 ID로 단일 통화 기록을 조회합니다.
 	GetCallHistoryByID(ctx context.Context, historyID uuid.UUID) (*domain.CallHistoryResponse, error)
 
-	// SaveTranscript stores or updates the transcript content for a room.
+	// SaveTranscript는 룸의 트랜스크립트 내용을 저장하거나 업데이트합니다.
 	SaveTranscript(ctx context.Context, roomID uuid.UUID, content string) (*domain.TranscriptResponse, error)
 
-	// GetTranscriptByCallHistoryID retrieves the transcript for a completed call.
+	// GetTranscriptByCallHistoryID는 완료된 통화의 트랜스크립트를 조회합니다.
 	GetTranscriptByCallHistoryID(ctx context.Context, callHistoryID uuid.UUID) (*domain.TranscriptResponse, error)
 }
 
-// roomService implements RoomService interface.
-// It coordinates between repository, LiveKit, and user-service client.
+// roomService는 RoomService 인터페이스를 구현합니다.
+// repository, LiveKit, user-service 클라이언트 간의 조정을 담당합니다.
 type roomService struct {
 	roomRepo    repository.RoomRepository
 	userClient  client.UserClient
@@ -99,9 +97,9 @@ type roomService struct {
 	logger      *zap.Logger
 }
 
-// NewRoomService creates a new RoomService with the given dependencies.
-// If LiveKit configuration is provided, it initializes the LiveKit client.
-// If userClient is nil, workspace validation will be skipped.
+// NewRoomService는 주어진 의존성으로 새 RoomService를 생성합니다.
+// LiveKit 설정이 제공되면 LiveKit 클라이언트를 초기화합니다.
+// userClient가 nil이면 워크스페이스 검증을 건너뜁니다.
 func NewRoomService(
 	roomRepo repository.RoomRepository,
 	userClient client.UserClient,
@@ -124,17 +122,19 @@ func NewRoomService(
 	}
 }
 
+// CreateRoom은 새 비디오 통화 룸을 생성합니다.
+// 워크스페이스 멤버십을 검증하고 DB와 LiveKit에 룸을 생성합니다.
 func (s *roomService) CreateRoom(ctx context.Context, req *domain.CreateRoomRequest, creatorID uuid.UUID, token string) (*domain.RoomResponse, error) {
 	workspaceID, err := uuid.Parse(req.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid workspace ID: %w", err)
 	}
 
-	// Validate workspace membership
+	// 워크스페이스 멤버십 검증
 	if s.userClient != nil {
 		isMember, err := s.userClient.ValidateWorkspaceMember(ctx, workspaceID, creatorID, token)
 		if err != nil {
-			s.logger.Error("Failed to validate workspace membership", zap.Error(err))
+			s.logger.Error("워크스페이스 멤버십 검증 실패", zap.Error(err))
 			return nil, fmt.Errorf("failed to validate workspace membership: %w", err)
 		}
 		if !isMember {
@@ -159,22 +159,29 @@ func (s *roomService) CreateRoom(ctx context.Context, req *domain.CreateRoomRequ
 		return nil, fmt.Errorf("failed to create room: %w", err)
 	}
 
-	// Create room in LiveKit
+	// LiveKit에 룸 생성
 	if s.lkClient != nil {
 		_, err := s.lkClient.CreateRoom(ctx, &livekit.CreateRoomRequest{
 			Name:            room.ID.String(),
-			EmptyTimeout:    300, // 5 minutes
+			EmptyTimeout:    300, // 5분
 			MaxParticipants: uint32(maxParticipants),
 		})
 		if err != nil {
-			s.logger.Warn("Failed to create LiveKit room", zap.Error(err))
+			s.logger.Warn("LiveKit 룸 생성 실패", zap.Error(err))
 		}
 	}
+
+	s.logger.Info("룸 생성 완료",
+		zap.String("room_id", room.ID.String()),
+		zap.String("workspace_id", workspaceID.String()),
+		zap.String("creator_id", creatorID.String()),
+	)
 
 	response := room.ToResponse()
 	return &response, nil
 }
 
+// GetRoom은 ID로 룸을 조회합니다.
 func (s *roomService) GetRoom(ctx context.Context, roomID uuid.UUID) (*domain.RoomResponse, error) {
 	room, err := s.roomRepo.GetByID(roomID)
 	if err != nil {
@@ -185,12 +192,13 @@ func (s *roomService) GetRoom(ctx context.Context, roomID uuid.UUID) (*domain.Ro
 	return &response, nil
 }
 
+// GetWorkspaceRooms는 워크스페이스의 룸 목록을 조회합니다.
 func (s *roomService) GetWorkspaceRooms(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID, token string, activeOnly bool) ([]domain.RoomResponse, error) {
-	// Validate workspace membership
+	// 워크스페이스 멤버십 검증
 	if s.userClient != nil {
 		isMember, err := s.userClient.ValidateWorkspaceMember(ctx, workspaceID, userID, token)
 		if err != nil {
-			s.logger.Error("Failed to validate workspace membership", zap.Error(err))
+			s.logger.Error("워크스페이스 멤버십 검증 실패", zap.Error(err))
 			return nil, fmt.Errorf("failed to validate workspace membership: %w", err)
 		}
 		if !isMember {
@@ -219,132 +227,15 @@ func (s *roomService) GetWorkspaceRooms(ctx context.Context, workspaceID uuid.UU
 	return responses, nil
 }
 
-func (s *roomService) JoinRoom(ctx context.Context, roomID, userID uuid.UUID, userName string, token string) (*domain.JoinRoomResponse, error) {
-	room, err := s.roomRepo.GetByID(roomID)
-	if err != nil {
-		return nil, ErrRoomNotFound
-	}
-
-	if !room.IsActive {
-		return nil, ErrRoomNotActive
-	}
-
-	// Validate workspace membership
-	if s.userClient != nil {
-		isMember, err := s.userClient.ValidateWorkspaceMember(ctx, room.WorkspaceID, userID, token)
-		if err != nil {
-			s.logger.Error("Failed to validate workspace membership", zap.Error(err))
-			return nil, fmt.Errorf("failed to validate workspace membership: %w", err)
-		}
-		if !isMember {
-			return nil, ErrNotWorkspaceMember
-		}
-	}
-
-	// Check if user is already in room record (even if inactive)
-	existingParticipant, _ := s.roomRepo.GetParticipant(roomID, userID)
-	if existingParticipant != nil {
-		// User is rejoining room
-		s.logger.Info("User rejoining room",
-			zap.String("room_id", roomID.String()),
-			zap.String("user_id", userID.String()),
-		)
-		existingParticipant.IsActive = true
-		existingParticipant.LeftAt = nil    // Clear leftAt since they are back
-		existingParticipant.Name = userName // Update name
-
-		if err := s.roomRepo.UpdateParticipant(existingParticipant); err != nil {
-			return nil, fmt.Errorf("failed to update participant: %w", err)
-		}
-
-	} else {
-		// New participant - check room capacity
-		count, err := s.roomRepo.CountActiveParticipants(roomID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to count participants: %w", err)
-		}
-		if count >= int64(room.MaxParticipants) {
-			return nil, ErrRoomFull
-		}
-
-		// Add participant
-		participant := &domain.RoomParticipant{
-			RoomID:   roomID,
-			UserID:   userID,
-			IsActive: true,
-			Name:     userName,
-		}
-		if err := s.roomRepo.AddParticipant(participant); err != nil {
-			return nil, fmt.Errorf("failed to add participant: %w", err)
-		}
-	}
-
-	// Generate LiveKit token
-	lkToken, err := s.generateLiveKitToken(room.ID.String(), userID.String(), userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate token: %w", err)
-	}
-
-	// Refresh room data
-	room, _ = s.roomRepo.GetByID(roomID)
-
-	return &domain.JoinRoomResponse{
-		Room:  room.ToResponse(),
-		Token: lkToken,
-		WSUrl: s.lkConfig.WSUrl,
-	}, nil
-}
-
-func (s *roomService) LeaveRoom(ctx context.Context, roomID, userID uuid.UUID) error {
-	// First check if room exists and get details (for creator check)
-	room, err := s.roomRepo.GetByID(roomID)
-	if err != nil {
-		return ErrRoomNotFound
-	}
-
-	// If the user leaving is the creator, End the room
-	if room.CreatorID == userID {
-		s.logger.Info("Creator leaving room, ending room", zap.String("room_id", roomID.String()))
-		return s.EndRoom(ctx, roomID, userID)
-	}
-
-	// Normal check if user is in room
-	_, err = s.roomRepo.GetParticipant(roomID, userID)
-	if err != nil {
-		return ErrNotInRoom
-	}
-
-	if err := s.roomRepo.RemoveParticipant(roomID, userID); err != nil {
-		return fmt.Errorf("failed to remove participant: %w", err)
-	}
-
-	// Check if room is empty and close it (secondary check)
-	count, _ := s.roomRepo.CountActiveParticipants(roomID)
-	if count == 0 {
-		room.IsActive = false
-		_ = s.roomRepo.Update(room)
-
-		// Create call history
-		s.createCallHistory(room)
-
-		// Delete room from LiveKit
-		if s.lkClient != nil {
-			_, _ = s.lkClient.DeleteRoom(ctx, &livekit.DeleteRoomRequest{
-				Room: room.ID.String(),
-			})
-		}
-	}
-
-	return nil
-}
-
+// EndRoom은 룸을 종료하고 통화 기록을 생성합니다.
+// 룸 생성자만 룸을 종료할 수 있습니다.
 func (s *roomService) EndRoom(ctx context.Context, roomID, userID uuid.UUID) error {
 	room, err := s.roomRepo.GetByID(roomID)
 	if err != nil {
 		return ErrRoomNotFound
 	}
 
-	// Only creator can end the room
+	// 생성자만 룸을 종료할 수 있음
 	if room.CreatorID != userID {
 		return errors.New("only room creator can end the room")
 	}
@@ -354,40 +245,25 @@ func (s *roomService) EndRoom(ctx context.Context, roomID, userID uuid.UUID) err
 		return fmt.Errorf("failed to end room: %w", err)
 	}
 
-	// Create call history
+	// 통화 기록 생성
 	s.createCallHistory(room)
 
-	// Delete room from LiveKit
+	// LiveKit에서 룸 삭제
 	if s.lkClient != nil {
 		_, _ = s.lkClient.DeleteRoom(ctx, &livekit.DeleteRoomRequest{
 			Room: room.ID.String(),
 		})
 	}
 
+	s.logger.Info("룸 종료 완료",
+		zap.String("room_id", roomID.String()),
+		zap.String("ended_by", userID.String()),
+	)
+
 	return nil
 }
 
-func (s *roomService) GetParticipants(ctx context.Context, roomID uuid.UUID) ([]domain.ParticipantResponse, error) {
-	participants, err := s.roomRepo.GetActiveParticipants(roomID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participants: %w", err)
-	}
-
-	responses := make([]domain.ParticipantResponse, len(participants))
-	for i, p := range participants {
-		responses[i] = domain.ParticipantResponse{
-			ID:       p.ID.String(),
-			UserID:   p.UserID.String(),
-			Name:     p.Name,
-			JoinedAt: p.JoinedAt,
-			LeftAt:   p.LeftAt,
-			IsActive: p.IsActive,
-		}
-	}
-
-	return responses, nil
-}
-
+// generateLiveKitToken은 LiveKit 액세스 토큰을 생성합니다.
 func (s *roomService) generateLiveKitToken(roomName, userID, userName string) (string, error) {
 	if s.lkConfig.APIKey == "" || s.lkConfig.APISecret == "" {
 		return "", errors.New("LiveKit credentials not configured")
@@ -404,232 +280,4 @@ func (s *roomService) generateLiveKitToken(roomName, userID, userName string) (s
 		SetValidFor(24 * time.Hour)
 
 	return at.ToJWT()
-}
-
-// createCallHistory creates a call history record when a room ends
-func (s *roomService) createCallHistory(room *domain.Room) {
-	// Get all participants (including those who left)
-	participants, err := s.roomRepo.GetAllParticipants(room.ID)
-	if err != nil {
-		s.logger.Error("Failed to get participants for call history", zap.Error(err))
-		return
-	}
-
-	if len(participants) == 0 {
-		s.logger.Debug("No participants found, skipping call history creation")
-		return
-	}
-
-	// Calculate call duration
-	endedAt := time.Now()
-	startedAt := room.CreatedAt
-	durationSeconds := int(endedAt.Sub(startedAt).Seconds())
-
-	// Deduplication Logic: Group by UserID
-	type UserStats struct {
-		JoinedAt time.Time
-		LeftAt   time.Time
-	}
-	userStatsMap := make(map[uuid.UUID]UserStats)
-
-	for _, p := range participants {
-		leftAt := endedAt
-		if p.LeftAt != nil {
-			leftAt = *p.LeftAt
-		}
-
-		stats, exists := userStatsMap[p.UserID]
-		if !exists {
-			userStatsMap[p.UserID] = UserStats{
-				JoinedAt: p.JoinedAt,
-				LeftAt:   leftAt,
-			}
-		} else {
-			// If already exists, take the earliest join and latest leave
-			if p.JoinedAt.Before(stats.JoinedAt) {
-				stats.JoinedAt = p.JoinedAt
-			}
-			if leftAt.After(stats.LeftAt) {
-				stats.LeftAt = leftAt
-			}
-			userStatsMap[p.UserID] = stats
-		}
-	}
-
-	// Create call history
-	history := &domain.CallHistory{
-		RoomID:            room.ID,
-		RoomName:          room.Name,
-		WorkspaceID:       room.WorkspaceID,
-		CreatorID:         room.CreatorID,
-		StartedAt:         startedAt,
-		EndedAt:           endedAt,
-		DurationSeconds:   durationSeconds,
-		MaxParticipants:   room.MaxParticipants,
-		TotalParticipants: len(userStatsMap),
-	}
-
-	// Create CallHistoryParticipant list from map
-	historyParticipants := make([]domain.CallHistoryParticipant, 0, len(userStatsMap))
-	for uid, stats := range userStatsMap {
-		participantDuration := int(stats.LeftAt.Sub(stats.JoinedAt).Seconds())
-
-		historyParticipants = append(historyParticipants, domain.CallHistoryParticipant{
-			UserID:          uid,
-			JoinedAt:        stats.JoinedAt,
-			LeftAt:          stats.LeftAt,
-			DurationSeconds: participantDuration,
-		})
-	}
-
-	history.Participants = historyParticipants
-
-	if err := s.roomRepo.CreateCallHistory(history); err != nil {
-		s.logger.Error("Failed to create call history", zap.Error(err))
-		return
-	}
-
-	s.logger.Info("Call history created",
-		zap.String("room_id", room.ID.String()),
-		zap.String("room_name", room.Name),
-		zap.Int("duration_seconds", durationSeconds),
-		zap.Int("total_participants", len(historyParticipants)),
-	)
-}
-
-// GetWorkspaceCallHistory returns call history for a workspace
-func (s *roomService) GetWorkspaceCallHistory(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID, token string, limit, offset int) ([]domain.CallHistoryResponse, int64, error) {
-	// Validate workspace membership
-	if s.userClient != nil {
-		isMember, err := s.userClient.ValidateWorkspaceMember(ctx, workspaceID, userID, token)
-		if err != nil {
-			s.logger.Error("Failed to validate workspace membership", zap.Error(err))
-			return nil, 0, fmt.Errorf("failed to validate workspace membership: %w", err)
-		}
-		if !isMember {
-			return nil, 0, ErrNotWorkspaceMember
-		}
-	}
-
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	histories, total, err := s.roomRepo.GetCallHistoryByWorkspace(workspaceID, limit, offset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get call history: %w", err)
-	}
-
-	responses := make([]domain.CallHistoryResponse, len(histories))
-	for i, h := range histories {
-		responses[i] = h.ToResponse()
-	}
-
-	return responses, total, nil
-}
-
-// GetUserCallHistory returns call history for a user
-func (s *roomService) GetUserCallHistory(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.CallHistoryResponse, int64, error) {
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	histories, total, err := s.roomRepo.GetCallHistoryByUser(userID, limit, offset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get call history: %w", err)
-	}
-
-	responses := make([]domain.CallHistoryResponse, len(histories))
-	for i, h := range histories {
-		responses[i] = h.ToResponse()
-	}
-
-	return responses, total, nil
-}
-
-// GetCallHistoryByID gets a single call history by ID
-func (s *roomService) GetCallHistoryByID(ctx context.Context, historyID uuid.UUID) (*domain.CallHistoryResponse, error) {
-	history, err := s.roomRepo.GetCallHistoryByID(historyID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get call history: %w", err)
-	}
-	if history == nil {
-		return nil, nil
-	}
-
-	response := history.ToResponse()
-	return &response, nil
-}
-
-// SaveTranscript saves or updates the transcript for a room
-func (s *roomService) SaveTranscript(ctx context.Context, roomID uuid.UUID, content string) (*domain.TranscriptResponse, error) {
-	// Find the call history for this room
-	// First try to get existing transcript
-	existingTranscript, _ := s.roomRepo.GetTranscriptByRoomID(roomID)
-
-	if existingTranscript != nil {
-		// Update existing transcript
-		existingTranscript.Content = content
-		if err := s.roomRepo.SaveTranscript(existingTranscript); err != nil {
-			return nil, fmt.Errorf("failed to update transcript: %w", err)
-		}
-		response := existingTranscript.ToResponse()
-		return &response, nil
-	}
-
-	// Create new transcript - we'll store it with roomID first
-	// The callHistoryID will be nil until the room ends
-	transcript := &domain.CallTranscript{
-		RoomID:  roomID,
-		Content: content,
-	}
-
-	// Try to find if there's already a call history for this room
-	// (in case the room has ended but transcript is being saved)
-	histories, _, _ := s.roomRepo.GetCallHistoryByWorkspace(uuid.Nil, 100, 0)
-	for _, h := range histories {
-		if h.RoomID == roomID {
-			transcript.CallHistoryID = h.ID
-			break
-		}
-	}
-
-	if err := s.roomRepo.SaveTranscript(transcript); err != nil {
-		return nil, fmt.Errorf("failed to save transcript: %w", err)
-	}
-
-	s.logger.Info("Transcript saved",
-		zap.String("room_id", roomID.String()),
-		zap.Int("content_length", len(content)),
-	)
-
-	response := transcript.ToResponse()
-	return &response, nil
-}
-
-// GetTranscriptByCallHistoryID returns the transcript for a call history
-func (s *roomService) GetTranscriptByCallHistoryID(ctx context.Context, callHistoryID uuid.UUID) (*domain.TranscriptResponse, error) {
-	transcript, err := s.roomRepo.GetTranscriptByCallHistoryID(callHistoryID)
-	if err != nil {
-		// Try to find by room ID from call history
-		history, histErr := s.roomRepo.GetCallHistoryByID(callHistoryID)
-		if histErr != nil {
-			return nil, fmt.Errorf("call history not found: %w", histErr)
-		}
-
-		// Try to find transcript by room ID
-		transcript, err = s.roomRepo.GetTranscriptByRoomID(history.RoomID)
-		if err != nil {
-			return nil, fmt.Errorf("transcript not found: %w", err)
-		}
-	}
-
-	response := transcript.ToResponse()
-	return &response, nil
 }

@@ -52,9 +52,9 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 		logger.Warn("User service URL not configured, workspace validation will be skipped")
 	}
 
-	// Initialize services
-	chatService := service.NewChatService(chatRepo, messageRepo, userClient, redisClient, logger)
-	presenceService := service.NewPresenceService(presenceRepo, redisClient, logger)
+	// Initialize services (메트릭 연동)
+	chatService := service.NewChatService(chatRepo, messageRepo, userClient, redisClient, logger, m)
+	presenceService := service.NewPresenceService(presenceRepo, redisClient, logger, m)
 
 	// Initialize validator
 	validator := middleware.NewAuthServiceValidator(cfg.Auth.ServiceURL, cfg.Auth.SecretKey, logger)
