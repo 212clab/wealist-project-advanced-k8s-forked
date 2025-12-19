@@ -119,19 +119,15 @@ helm-install-monitoring: ## Install monitoring stack (Prometheus, Loki, Grafana)
 	@echo "  Monitoring Stack Installed Successfully!"
 	@echo "=============================================="
 	@echo ""
-	@echo "  To access monitoring services, run:"
+	@echo "  Access URLs (via Ingress):"
+	@echo "    - Grafana:    https://$(DOMAIN)/monitoring/grafana"
+	@echo "    - Prometheus: https://$(DOMAIN)/monitoring/prometheus"
+	@echo "    - Loki:       https://$(DOMAIN)/monitoring/loki"
 	@echo ""
+	@echo "  Grafana Login: admin / admin"
+	@echo ""
+	@echo "  For local development (port-forward):"
 	@echo "    make port-forward-monitoring ENV=$(ENV)"
-	@echo ""
-	@echo "  Or individually:"
-	@echo "    make port-forward-grafana ENV=$(ENV)"
-	@echo "    make port-forward-prometheus ENV=$(ENV)"
-	@echo "    make port-forward-loki ENV=$(ENV)"
-	@echo ""
-	@echo "  Access URLs (after port-forward):"
-	@echo "    - Grafana:    http://localhost:3001 (admin/admin)"
-	@echo "    - Prometheus: http://localhost:9090"
-	@echo "    - Loki:       http://localhost:3100"
 	@echo "=============================================="
 
 helm-install-all: helm-deps-build helm-install-cert-manager helm-install-infra ## Install all charts (infra + services + monitoring)
@@ -139,8 +135,6 @@ helm-install-all: helm-deps-build helm-install-cert-manager helm-install-infra #
 	@$(MAKE) helm-install-services ENV=$(ENV)
 	@sleep 3
 	@$(MAKE) helm-install-monitoring ENV=$(ENV)
-	@sleep 2
-	@$(MAKE) port-forward-monitoring ENV=$(ENV)
 
 helm-install-all-init: helm-deps-build helm-install-cert-manager helm-install-infra ## Install all with DB migration (first time)
 	@sleep 5

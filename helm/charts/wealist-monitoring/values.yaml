@@ -181,6 +181,21 @@ grafana:
 
   config:
     allowSignUp: false
+    # Sub-path configuration (for Ingress access via /monitoring/grafana)
+    rootUrl: "http://localhost:3000"
+    serveFromSubPath: "false"
+
+# =============================================================================
+# Monitoring Ingress - External Access via domain/monitoring/*
+# =============================================================================
+# Note: Named 'monitoringIngress' to avoid conflict with infrastructure 'ingress'
+monitoringIngress:
+  enabled: false  # Enable in environments with Ingress controller
+  className: nginx
+  annotations: {}
+  hosts: []
+  # - host: dev.wealist.co.kr
+  tls: []
 
 # =============================================================================
 # PostgreSQL Exporter - External PostgreSQL Metrics

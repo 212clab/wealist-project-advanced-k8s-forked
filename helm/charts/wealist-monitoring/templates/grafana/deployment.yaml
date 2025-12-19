@@ -44,8 +44,11 @@ spec:
                   key: password
             - name: GF_USERS_ALLOW_SIGN_UP
               value: {{ .Values.grafana.config.allowSignUp | quote }}
+            # Sub-path configuration for Ingress access
             - name: GF_SERVER_ROOT_URL
-              value: "http://localhost:{{ .Values.grafana.service.nodePort }}"
+              value: {{ .Values.grafana.config.rootUrl | default "http://localhost:3000" | quote }}
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: {{ .Values.grafana.config.serveFromSubPath | default "false" | quote }}
           livenessProbe:
             httpGet:
               path: /api/health
