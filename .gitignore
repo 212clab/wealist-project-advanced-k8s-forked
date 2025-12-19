@@ -34,6 +34,9 @@ secrets.yaml
 k8s/base/shared/secret-shared.yaml
 services/auth-service/k8s/base/secret.yaml
 
+## 환경변수 
+local-kind.yaml
+local-ubuntu.yaml
 # Private keys (NEVER commit)
 *.key
 sealed-secrets-*.key
