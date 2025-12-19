@@ -111,11 +111,17 @@ func main() {
 		logger.Warn("S3 configuration incomplete, file uploads disabled")
 	}
 
-	// Initialize Auth validator (공통 모듈 사용)
+	// Initialize Auth validator (SmartValidator for RS256 JWKS support)
 	var tokenValidator middleware.TokenValidator
 	if cfg.AuthAPI.BaseURL != "" {
-		tokenValidator = middleware.NewAuthServiceValidator(cfg.AuthAPI.BaseURL, cfg.JWT.Secret, logger)
-		logger.Info("Auth validator initialized", zap.String("auth_api_url", cfg.AuthAPI.BaseURL))
+		jwtIssuer := os.Getenv("JWT_ISSUER")
+		if jwtIssuer == "" {
+			jwtIssuer = "wealist-auth-service"
+		}
+		tokenValidator = middleware.NewSmartValidator(cfg.AuthAPI.BaseURL, jwtIssuer, logger)
+		logger.Info("SmartValidator initialized",
+			zap.String("auth_api_url", cfg.AuthAPI.BaseURL),
+			zap.String("jwt_issuer", jwtIssuer))
 	}
 
 	// Initialize User API client

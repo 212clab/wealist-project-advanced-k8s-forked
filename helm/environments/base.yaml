@@ -126,6 +126,9 @@ shared:
     REDIS_HOST: "redis"
     REDIS_PORT: "6379"
 
+    # JWT Configuration
+    JWT_ISSUER: "wealist-auth-service"
+
     # Service URLs
     AUTH_SERVICE_URL: "http://auth-service:8080"
     USER_SERVICE_URL: "http://user-service:8081"
@@ -145,7 +148,7 @@ shared:
     CORS_ORIGINS: "*"
 
     # OAuth2 Redirect URLs (override per environment)
-    OAUTH2_CLIENT_REDIRECT_URI: "http://localhost/login/oauth2/code/google"
+    OAUTH2_CLIENT_REDIRECT_URI: "http://localhost/oauth2/callback/google"
     OAUTH2_REDIRECT_URL_ENV: "http://localhost/oauth/callback"
 
     # LiveKit (WebRTC) - non-sensitive

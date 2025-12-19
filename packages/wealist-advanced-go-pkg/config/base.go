@@ -41,7 +41,8 @@ type RedisConfig struct {
 // AuthConfig contains authentication configuration.
 type AuthConfig struct {
 	ServiceURL string `yaml:"service_url"`
-	SecretKey  string `yaml:"secret_key"`
+	SecretKey  string `yaml:"secret_key"`  // Deprecated: use JWTIssuer with SmartValidator
+	JWTIssuer  string `yaml:"jwt_issuer"`  // JWT issuer for JWKS validation
 }
 
 // UserAPIConfig contains User API client configuration.
@@ -118,6 +119,12 @@ func (c *BaseConfig) LoadFromEnv() {
 	}
 	if secretKey := os.Getenv("SECRET_KEY"); secretKey != "" {
 		c.Auth.SecretKey = secretKey
+	}
+	if jwtIssuer := os.Getenv("JWT_ISSUER"); jwtIssuer != "" {
+		c.Auth.JWTIssuer = jwtIssuer
+	}
+	if c.Auth.JWTIssuer == "" {
+		c.Auth.JWTIssuer = "wealist-auth-service" // default issuer
 	}
 
 	// User API config

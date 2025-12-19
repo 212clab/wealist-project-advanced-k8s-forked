@@ -62,8 +62,9 @@ type JWTConfig struct {
 
 // AuthAPIConfig holds Auth Service configuration for token validation
 type AuthAPIConfig struct {
-	BaseURL string        `yaml:"base_url"`
-	Timeout time.Duration `yaml:"timeout"`
+	BaseURL   string        `yaml:"base_url"`
+	Timeout   time.Duration `yaml:"timeout"`
+	JWTIssuer string        `yaml:"jwt_issuer"` // JWT issuer for JWKS validation
 }
 
 // UserAPIConfig holds User API configuration
@@ -266,6 +267,13 @@ func (c *Config) overrideFromEnv() {
 	}
 	if c.AuthAPI.Timeout == 0 {
 		c.AuthAPI.Timeout = 5 * time.Second
+	}
+	// JWT Issuer for JWKS validation
+	if issuer := os.Getenv("JWT_ISSUER"); issuer != "" {
+		c.AuthAPI.JWTIssuer = issuer
+	}
+	if c.AuthAPI.JWTIssuer == "" {
+		c.AuthAPI.JWTIssuer = "wealist-auth-service" // default issuer
 	}
 
 	// User API - USER_SERVICE_URL alias (original format takes precedence)

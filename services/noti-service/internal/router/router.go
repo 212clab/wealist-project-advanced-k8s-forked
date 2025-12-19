@@ -47,8 +47,11 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	// 알림 서비스 초기화 (메트릭 포함)
 	notificationService := service.NewNotificationService(notificationRepo, redisClient, cfg, logger, m)
 
-	// Initialize handlers
-	validator := middleware.NewAuthServiceValidator(cfg.BaseConfig.Auth.ServiceURL, cfg.BaseConfig.Auth.SecretKey, logger)
+	// Initialize validator (SmartValidator for RS256 JWKS support)
+	validator := middleware.NewSmartValidator(cfg.BaseConfig.Auth.ServiceURL, cfg.BaseConfig.Auth.JWTIssuer, logger)
+	logger.Info("SmartValidator initialized",
+		zap.String("auth_service_url", cfg.BaseConfig.Auth.ServiceURL),
+		zap.String("jwt_issuer", cfg.BaseConfig.Auth.JWTIssuer))
 	notificationHandler := handler.NewNotificationHandler(notificationService, sseService, logger)
 
 	// Health check routes (using common package)

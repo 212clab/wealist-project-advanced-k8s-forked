@@ -11,6 +11,9 @@ data:
   ENV: {{ .Values.shared.config.ENV | quote }}
   LOG_LEVEL: {{ .Values.shared.config.LOG_LEVEL | quote }}
 
+  # JWT Configuration
+  JWT_ISSUER: {{ .Values.shared.config.JWT_ISSUER | default "wealist-auth-service" | quote }}
+
   # Service Discovery URLs
   AUTH_SERVICE_URL: {{ .Values.shared.config.AUTH_SERVICE_URL | quote }}
   USER_SERVICE_URL: {{ .Values.shared.config.USER_SERVICE_URL | quote }}

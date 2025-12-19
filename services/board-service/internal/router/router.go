@@ -24,7 +24,9 @@ import (
 type Config struct {
 	DB                 *gorm.DB
 	Logger             *zap.Logger
-	JWTSecret          string
+	JWTSecret          string // Deprecated: Use AuthServiceURL + JWTIssuer instead
+	AuthServiceURL     string // auth-service URL for SmartValidator
+	JWTIssuer          string // JWT issuer for JWKS validation
 	UserClient         client.UserClient
 	BasePath           string
 	UserServiceBaseURL string
@@ -114,8 +116,17 @@ func Setup(cfg Config) *gin.Engine {
 		cfg.Logger.Info("Metrics endpoint configured at root path", zap.String("path", "/metrics"))
 	}
 
+	// Initialize SmartValidator for JWT authentication
+	var tokenValidator middleware.TokenValidator
+	if cfg.AuthServiceURL != "" {
+		tokenValidator = middleware.NewSmartValidator(cfg.AuthServiceURL, cfg.JWTIssuer, cfg.Logger)
+		cfg.Logger.Info("SmartValidator initialized",
+			zap.String("auth_service_url", cfg.AuthServiceURL),
+			zap.String("jwt_issuer", cfg.JWTIssuer))
+	}
+
 	// Setup API routes
-	setupRoutes(baseGroup, cfg.JWTSecret, projectHandler, boardHandler, participantHandler, commentHandler, fieldOptionHandler, projectMemberHandler, projectJoinRequestHandler, attachmentHandler)
+	setupRoutes(baseGroup, tokenValidator, projectHandler, boardHandler, participantHandler, commentHandler, fieldOptionHandler, projectMemberHandler, projectJoinRequestHandler, attachmentHandler)
 
 	// 🔥 [중요] WebSocket은 baseGroup에 직접 등록 (chat-service와 동일한 패턴)
 	// basePath가 /api/boards일 때: /api/boards/ws/project/:projectId
@@ -127,7 +138,7 @@ func Setup(cfg Config) *gin.Engine {
 // setupRoutes configures all API routes
 func setupRoutes(
 	baseGroup *gin.RouterGroup,
-	jwtSecret string,
+	tokenValidator middleware.TokenValidator,
 	projectHandler *handler.ProjectHandler,
 	boardHandler *handler.BoardHandler,
 	participantHandler *handler.ParticipantHandler,
@@ -139,7 +150,9 @@ func setupRoutes(
 ) {
 	// API group with authentication
 	api := baseGroup.Group("/api")
-	api.Use(middleware.Auth(jwtSecret))
+	if tokenValidator != nil {
+		api.Use(middleware.AuthWithValidator(tokenValidator))
+	}
 	{
 		// Project routes
 		projects := api.Group("/projects")

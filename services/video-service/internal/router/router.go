@@ -53,8 +53,11 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	// 룸 서비스 초기화 (메트릭 포함)
 	roomService := service.NewRoomService(roomRepo, userClient, cfg.LiveKit, redisClient, logger, m)
 
-	// Initialize validator
-	validator := middleware.NewAuthServiceValidator(cfg.Auth.ServiceURL, cfg.Auth.SecretKey, logger)
+	// Initialize validator (SmartValidator for RS256 JWKS support)
+	validator := middleware.NewSmartValidator(cfg.Auth.ServiceURL, cfg.Auth.JWTIssuer, logger)
+	logger.Info("SmartValidator initialized",
+		zap.String("auth_service_url", cfg.Auth.ServiceURL),
+		zap.String("jwt_issuer", cfg.Auth.JWTIssuer))
 
 	// Initialize handlers
 	roomHandler := handler.NewRoomHandler(roomService, logger)

@@ -56,8 +56,11 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	chatService := service.NewChatService(chatRepo, messageRepo, userClient, redisClient, logger, m)
 	presenceService := service.NewPresenceService(presenceRepo, redisClient, logger, m)
 
-	// Initialize validator
-	validator := middleware.NewAuthServiceValidator(cfg.Auth.ServiceURL, cfg.Auth.SecretKey, logger)
+	// Initialize validator (SmartValidator for RS256 JWKS support)
+	validator := middleware.NewSmartValidator(cfg.Auth.ServiceURL, cfg.Auth.JWTIssuer, logger)
+	logger.Info("SmartValidator initialized",
+		zap.String("auth_service_url", cfg.Auth.ServiceURL),
+		zap.String("jwt_issuer", cfg.Auth.JWTIssuer))
 
 	// Initialize WebSocket hub
 	wsHub := websocket.NewHub(chatService, presenceService, validator, redisClient, logger)
