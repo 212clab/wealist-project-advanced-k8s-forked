@@ -47,6 +47,23 @@ const getApiBaseUrl = (path: string): string => {
   // 예: getApiBaseUrl('/api/users') → '/svc/user'
   //     axios.get('/api/workspaces/all') → '/svc/user/api/workspaces/all'
   if (isIngressMode) {
+    const hostname = window.location.hostname;
+    // Docker 개발 환경 (localhost): nginx 게이트웨이 사용
+    // config.js에서 API_BASE_URL=""로 설정되어 isIngressMode=true가 되지만,
+    // API는 상대 경로가 아닌 절대 경로가 필요함 (localhost:3000 → localhost:80)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      const localBaseUrl = 'http://localhost';
+      if (path?.includes('/api/auth')) return `${localBaseUrl}/api/auth`;
+      if (path?.includes('/api/users')) return localBaseUrl;
+      if (path?.includes('/api/workspaces')) return localBaseUrl;
+      if (path?.includes('/api/profiles')) return localBaseUrl;
+      if (path?.includes('/api/boards')) return `${localBaseUrl}/api/boards/api`;
+      if (path?.includes('/api/chats')) return `${localBaseUrl}${path}`;
+      if (path?.includes('/api/notifications')) return localBaseUrl;
+      if (path?.includes('/api/storage')) return `${localBaseUrl}/api/storage/api`;
+      if (path?.includes('/api/video')) return localBaseUrl;
+      return localBaseUrl;
+    }
     return getIngressServicePrefix(path);
   }
 
