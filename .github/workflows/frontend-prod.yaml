@@ -34,6 +34,11 @@ on:
         description: "Version label for S3 folder (e.g., 1.0.0)"
         required: true
         type: string
+      mark_as_stable:
+        description: "Mark this version as stable (adds :stable tag)"
+        required: false
+        default: false
+        type: boolean
 
 env:
   NODE_VERSION: "20"
@@ -136,6 +141,17 @@ jobs:
 
           echo "✅ Tagged image as :latest and :v${{ needs.validate.outputs.version }}"
 
+      - name: Add stable tag (if requested)
+        if: inputs.mark_as_stable == true
+        run: |
+          SOURCE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.image_tag }}"
+
+          # Tag as :stable
+          docker tag "${SOURCE}" "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stable"
+          docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stable"
+
+          echo "🏆 Tagged image as :stable"
+
       - name: Image Tag Summary
         run: |
           echo "## 🏷️ Production Image Tags Updated" >> $GITHUB_STEP_SUMMARY
@@ -144,6 +160,9 @@ jobs:
           echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| \`:latest\` | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| \`:v${{ needs.validate.outputs.version }}\` | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ needs.validate.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.mark_as_stable }}" == "true" ]; then
+            echo "| \`:stable\` 🏆 | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stable\` |" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ===========================================================================
   # Job 3: Deploy to S3 (Prod)
