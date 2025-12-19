@@ -71,7 +71,7 @@ destinationRules:
       maxConnections: 100
       connectTimeout: 10s
     http:
-      h2UpgradePolicy: UPGRADE
+      h2UpgradePolicy: DO_NOT_UPGRADE  # Go services use HTTP/1.1
       http1MaxPendingRequests: 100
       http2MaxRequests: 1000
       maxRequestsPerConnection: 100
@@ -198,3 +198,80 @@ services:
     port: 8004
   - name: frontend
     port: 80
+
+# -----------------------------------------------------------------------------
+# Service-to-Service Authorization (ServiceAccount-based)
+# Defines which services can call which other services
+# -----------------------------------------------------------------------------
+serviceAuthorization:
+  enabled: true
+  rules:
+    # user-service: receives calls from multiple services for workspace validation
+    user-service:
+      allowedCallers:
+        - board-service
+        - chat-service
+        - storage-service
+        - video-service
+      allowedPaths:
+        - /api/workspaces/*/validate-member/*
+        - /api/users/*
+        - /api/profiles/*
+        - /health/*
+        - /internal/*
+
+    # auth-service: JWT validation and JWKS endpoint
+    auth-service:
+      allowedCallers:
+        - board-service  # WebSocket token validation
+      allowedPaths:
+        - /api/auth/validate
+        - /.well-known/*
+        - /actuator/health/*
+
+    # noti-service: receives notifications from board and chat
+    noti-service:
+      allowedCallers:
+        - board-service
+        - chat-service
+      allowedPaths:
+        - /api/*
+        - /internal/*
+        - /sse/*
+        - /health/*
+
+    # board-service: gateway only (no internal callers)
+    board-service:
+      allowedCallers: []
+      allowedPaths:
+        - /api/*
+        - /health/*
+        - /internal/*
+
+    # chat-service: gateway only
+    chat-service:
+      allowedCallers: []
+      allowedPaths:
+        - /api/*
+        - /ws/*
+        - /health/*
+
+    # storage-service: gateway only
+    storage-service:
+      allowedCallers: []
+      allowedPaths:
+        - /api/*
+        - /health/*
+
+    # video-service: gateway only
+    video-service:
+      allowedCallers: []
+      allowedPaths:
+        - /api/*
+        - /health/*
+
+    # frontend: gateway only
+    frontend:
+      allowedCallers: []
+      allowedPaths:
+        - /*

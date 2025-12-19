@@ -79,7 +79,7 @@ autoscaling:
   enabled: false
 
 serviceAccount:
-  create: false
+  create: true
 
 networkPolicy:
   enabled: false
@@ -151,7 +151,11 @@ istio:
 
   authorizationPolicy:
     enabled: true
-    denyAll: false  # Don't enforce deny-all in local
+    denyAll: true  # Zero Trust - enforce deny-all in local
+
+  # ServiceAccount-based service-to-service authorization
+  serviceAuthorization:
+    enabled: true
 
   jwtAuth:
     enabled: true

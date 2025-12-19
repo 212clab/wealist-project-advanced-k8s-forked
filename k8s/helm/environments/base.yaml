@@ -66,8 +66,8 @@ securityContext:
 # Service Account
 # -----------------------------------------------------------------------------
 serviceAccount:
-  create: false
-  name: ""
+  create: true
+  name: ""  # 차트명 사용 (e.g., board-service)
   annotations: {}
 
 # -----------------------------------------------------------------------------
