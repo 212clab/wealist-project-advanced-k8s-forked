@@ -152,3 +152,29 @@ istio:
       samplingPercentage: 100  # 100% for local debugging
     accessLogging:
       enabled: true
+
+# =============================================================================
+# Monitoring Stack (wealist-monitoring chart values)
+# =============================================================================
+
+# Grafana - Visualization Dashboard
+grafana:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 3000
+  config:
+    allowSignUp: false
+    # localhost 접속용 (sub-path 사용)
+    rootUrl: "http://localhost/monitoring/grafana"
+    serveFromSubPath: "true"
+
+# Monitoring Ingress - localhost/monitoring/* 접근
+monitoringIngress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: localhost
+  tls: []
