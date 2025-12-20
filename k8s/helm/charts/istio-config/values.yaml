@@ -122,9 +122,23 @@ httpRoute:
   frontend:
     enabled: true  # localhost: true, dev: false
 
+# =============================================================================
+# mTLS Configuration
+# =============================================================================
 mtls:
   enabled: true
   mode: PERMISSIVE  # Allow both mTLS and plain HTTP for DB connections
+
+# =============================================================================
+# Database mTLS Configuration
+# =============================================================================
+# PostgreSQL/Redis use their own wire protocols (not HTTP)
+# mTLS interferes with these connections, so we disable it for DB pods
+database:
+  postgres:
+    disableMtls: true  # Disable mTLS for postgres pods
+  redis:
+    disableMtls: true  # Disable mTLS for redis pods
 
 destinationRules:
   enabled: true

@@ -202,6 +202,13 @@ istio:
     enabled: true
     mode: STRICT  # dev: 전체 mTLS 강제 (PERMISSIVE → STRICT)
 
+  # Database mTLS 설정 (dev 환경은 외부 DB 사용, Pod 없음)
+  database:
+    postgres:
+      disableMtls: false  # 외부 DB 사용 - Pod 없음
+    redis:
+      disableMtls: false  # 외부 DB 사용 - Pod 없음
+
   # ==========================================================================
   # DestinationRule (Circuit Breaker, Connection Pool, Outlier Detection)
   # ==========================================================================

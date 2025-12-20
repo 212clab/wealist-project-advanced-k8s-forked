@@ -215,6 +215,13 @@ istio:
     enabled: true
     mode: PERMISSIVE  # 개발 환경: mTLS + 일반 HTTP 모두 허용
 
+  # Database mTLS 설정 (PostgreSQL/Redis는 자체 프로토콜 사용)
+  database:
+    postgres:
+      disableMtls: true  # postgres pod에 mTLS 비활성화
+    redis:
+      disableMtls: true  # redis pod에 mTLS 비활성화
+
   # 트래픽 제어 - Circuit Breaker, Connection Pool
   destinationRules:
     enabled: true
