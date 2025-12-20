@@ -1,0 +1,344 @@
+# =============================================================================
+# 개발 환경 설정 (ENV=dev)
+# =============================================================================
+# 도메인: dev.wealist.co.kr (CloudFront + Route53)
+# 네임스페이스: wealist-dev
+# 특징:
+#   - Frontend: CloudFront/S3 (Pod 없음)
+#   - Backend: Kind 클러스터
+#   - DB: 호스트 PC의 PostgreSQL/Redis
+#
+# 사전 요구사항:
+#   1. PostgreSQL 설치: brew install postgresql / apt install postgresql
+#   2. Redis 설치: brew install redis / apt install redis-server
+#   3. make kind-setup-db 실행하여 DB 설정 완료
+
+# -----------------------------------------------------------------------------
+# 전역 설정
+# -----------------------------------------------------------------------------
+global:
+  namespace: wealist-dev
+  environment: development
+  domain: dev.wealist.co.kr
+  imageRegistry: localhost:5001
+
+# -----------------------------------------------------------------------------
+# Frontend (비활성화 - CloudFront/S3에서 서빙)
+# -----------------------------------------------------------------------------
+frontend:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# cert-manager (localhost에서는 비활성화)
+# -----------------------------------------------------------------------------
+certManager:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# 배포 설정
+# -----------------------------------------------------------------------------
+image:
+  pullPolicy: Always
+  tag: "latest"
+
+# -----------------------------------------------------------------------------
+# 보안 컨텍스트 (로컬 개발용 - 완화된 설정)
+# -----------------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: false
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: false
+  runAsUser: 0  # nginx(프론트엔드)가 chown 실행에 필요
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: []  # 로컬 개발에서는 엄격한 권한 제한 불필요
+
+# -----------------------------------------------------------------------------
+# 기능 설정 (로컬 개발용 - 비활성화)
+# -----------------------------------------------------------------------------
+autoscaling:
+  enabled: false
+
+serviceAccount:
+  create: false
+
+networkPolicy:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# 데이터베이스 설정 (호스트 PC의 외부 DB 사용)
+# -----------------------------------------------------------------------------
+# Kind 클러스터는 Docker 브릿지 네트워크(172.18.0.0/16) 사용
+# 172.18.0.1은 Kind Pod가 호스트 머신에 접근하는 게이트웨이 IP
+#
+# PostgreSQL 설정 필요:
+#   - pg_hba.conf: host all all 172.18.0.0/16 trust
+#   - postgresql.conf: listen_addresses = '*'
+#
+# Redis 설정 필요:
+#   - redis.conf: bind 0.0.0.0, protected-mode no
+
+postgres:
+  enabled: false  # 클러스터 내부 PostgreSQL StatefulSet 비활성화
+  external:
+    enabled: true
+    host: "172.18.0.1"  # Kind 브릿지 게이트웨이 (호스트 머신)
+    port: 5432
+
+redis:
+  enabled: false  # 클러스터 내부 Redis StatefulSet 비활성화
+  external:
+    enabled: true
+    host: "172.18.0.1"  # Kind 브릿지 게이트웨이 (호스트 머신)
+    port: 6379
+
+# -----------------------------------------------------------------------------
+# 공유 설정
+# -----------------------------------------------------------------------------
+shared:
+  config:
+    ENV: "development"
+    LOG_LEVEL: "debug"
+    CORS_ORIGINS: "*"
+    S3_PUBLIC_ENDPOINT: "http://localhost/minio"
+    LIVEKIT_WS_URL: "ws://localhost/svc/livekit"
+
+    # OAuth2 리다이렉트 URL (localhost, TLS 없음)
+    OAUTH2_CLIENT_REDIRECT_URI: "http://localhost/login/oauth2/code/google"
+    OAUTH2_REDIRECT_URL_ENV: "http://localhost/oauth/callback"
+
+    # DB 자동 마이그레이션 (외부 DB에 기존 데이터가 있으므로 비활성화)
+    DB_AUTO_MIGRATE: "false"
+
+    # 외부 데이터베이스 연결 설정 (호스트 PC의 PostgreSQL/Redis)
+    DB_HOST: "postgres"       # K8s 서비스명 (172.18.0.1로 라우팅됨)
+    DB_PORT: "5432"
+    DB_USER: "postgres"
+    DB_SSLMODE: "disable"
+    REDIS_HOST: "redis"       # K8s 서비스명 (172.18.0.1로 라우팅됨)
+    REDIS_PORT: "6379"
+
+  # 시크릿 (dev 환경용)
+  secrets:
+    DB_PASSWORD: "postgres"
+    REDIS_PASSWORD: ""
+
+# -----------------------------------------------------------------------------
+# Ingress 설정 (비활성화 - Istio HTTPRoute 사용)
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: false  # Istio HTTPRoute 사용
+
+# -----------------------------------------------------------------------------
+# Istio 서비스 메시 설정 (전체 보안 기능 활성화)
+# -----------------------------------------------------------------------------
+istio:
+  enabled: true  # Istio 설정 배포 활성화
+  namespace: wealist-dev
+
+  # Istio Gateway (deprecated - Kubernetes Gateway API 사용)
+  gateway:
+    enabled: false  # K8s Gateway API in istio-system 사용
+
+  # HTTPRoute (Kubernetes Gateway API)
+  httpRoute:
+    enabled: true
+    gatewayRef:
+      name: istio-ingressgateway
+      namespace: istio-system
+    hosts:
+      - "dev.wealist.co.kr"
+      - "api.dev.wealist.co.kr"
+      - "*"
+    routes:
+      auth:
+        prefix: /svc/auth
+        host: auth-service
+        port: 8080
+        timeout: 30s
+      user:
+        prefix: /svc/user
+        host: user-service
+        port: 8081
+        timeout: 30s
+      board:
+        prefix: /svc/board
+        host: board-service
+        port: 8000
+        timeout: 3600s
+      chat:
+        prefix: /svc/chat
+        host: chat-service
+        port: 8001
+        timeout: 3600s
+      noti:
+        prefix: /svc/noti
+        host: noti-service
+        port: 8002
+        timeout: 3600s
+      storage:
+        prefix: /svc/storage
+        host: storage-service
+        port: 8003
+        timeout: 300s
+      video:
+        prefix: /svc/video
+        host: video-service
+        port: 8004
+        timeout: 3600s
+    # Frontend 비활성화 (CloudFront/S3에서 서빙)
+    frontend:
+      enabled: false
+
+  # ==========================================================================
+  # mTLS 설정 (서비스 간 암호화 통신)
+  # ==========================================================================
+  mtls:
+    enabled: true
+    mode: STRICT  # dev: 전체 mTLS 강제 (PERMISSIVE → STRICT)
+
+  # Database mTLS 설정 (dev 환경은 외부 DB 사용, Pod 없음)
+  database:
+    postgres:
+      disableMtls: false  # 외부 DB 사용 - Pod 없음
+    redis:
+      disableMtls: false  # 외부 DB 사용 - Pod 없음
+
+  # ==========================================================================
+  # DestinationRule (Circuit Breaker, Connection Pool, Outlier Detection)
+  # ==========================================================================
+  destinationRules:
+    enabled: true
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 10s
+      http:
+        h2UpgradePolicy: DO_NOT_UPGRADE  # Go 서비스는 HTTP/1.1 사용
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 100
+        maxRetries: 3
+    outlierDetection:
+      consecutive5xxErrors: 5
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+
+  # ==========================================================================
+  # Retry Policy
+  # ==========================================================================
+  retryPolicy:
+    enabled: true
+    attempts: 3
+    perTryTimeout: 5s
+    retryOn: gateway-error,connect-failure,refused-stream,retriable-4xx,reset
+
+  # ==========================================================================
+  # Authorization Policy (Zero Trust 모델)
+  # ==========================================================================
+  authorizationPolicy:
+    enabled: true
+    denyAll: true  # dev: Zero Trust - 기본 거부, 명시적 허용만
+
+  # ==========================================================================
+  # Service-to-Service Authorization (ServiceAccount 기반)
+  # ==========================================================================
+  serviceAuthorization:
+    enabled: true  # dev: 서비스 간 통신 제어 활성화
+
+  # ==========================================================================
+  # JWT 인증 (RS256 JWKS 기반)
+  # ==========================================================================
+  jwtAuth:
+    enabled: true  # dev: JWT 검증 활성화
+    issuer: wealist-auth-service
+    jwksUri: "http://auth-service:8080/.well-known/jwks.json"
+    excludePaths:
+      - /health/*
+      - /actuator/health/*
+      - /.well-known/*
+      - /oauth2/*
+      - /login/oauth2/*
+      - /api/auth/login
+      - /api/auth/register
+      - /api/auth/refresh
+      - /api/auth/oauth2/*
+      - /swagger-ui/*
+      - /v3/api-docs/*
+      - /  # Frontend static files
+
+  # ==========================================================================
+  # Telemetry (추적 및 로깅)
+  # ==========================================================================
+  telemetry:
+    tracing:
+      enabled: true
+      samplingPercentage: 100  # 개발 디버깅용 100% 샘플링
+      provider: jaeger
+    accessLogging:
+      enabled: true
+      provider: envoy
+
+  # ==========================================================================
+  # Ambient Mesh 설정 (사이드카 없는 서비스 메시)
+  # ==========================================================================
+  ambient:
+    enabled: true
+    waypoint:
+      enabled: true  # Waypoint Proxy로 L7 기능 사용
+      name: wealist-waypoint
+
+# =============================================================================
+# 모니터링 스택 설정 (wealist-monitoring 차트 값)
+# =============================================================================
+
+# Prometheus - 메트릭 수집
+prometheus:
+  enabled: true
+  config:
+    # Ingress 접근용 외부 URL
+    externalUrl: "http://localhost/monitoring/prometheus"
+
+# Grafana - 시각화 대시보드
+grafana:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 3000
+  config:
+    allowSignUp: false
+    # localhost 접속용 (sub-path 사용)
+    rootUrl: "http://localhost/monitoring/grafana"
+    serveFromSubPath: "true"
+
+# 모니터링 Ingress (비활성화 - Istio HTTPRoute 사용)
+monitoringIngress:
+  enabled: false  # Istio HTTPRoute 사용
+
+# -----------------------------------------------------------------------------
+# 데이터베이스 Exporter (PostgreSQL/Redis 메트릭 수집)
+# -----------------------------------------------------------------------------
+postgresExporter:
+  enabled: true
+  config:
+    host: "172.18.0.1"  # 외부 DB (호스트 머신)
+    port: 5432
+    user: "postgres"
+    database: "postgres"
+    sslmode: "disable"
+
+redisExporter:
+  enabled: true
+  config:
+    host: "172.18.0.1"  # 외부 DB (호스트 머신)
+    port: 6379
