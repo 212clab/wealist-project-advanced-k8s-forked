@@ -10,17 +10,9 @@
 .PHONY: helm-setup-route53-secret
 .PHONY: helm-local-kind helm-local-ubuntu helm-dev helm-staging helm-prod
 
-# Determine which services to deploy based on environment
-# Frontend is only deployed in local environments (docker-compose, localhost)
-# Cloud environments (dev, staging, prod) use CDN/S3/Route53 for frontend
-ifeq ($(ENV),local-kind)
-  HELM_SERVICES = $(SERVICES)
-# DEPRECATED-SOON: local-ubuntu will be replaced by staging
-else ifeq ($(ENV),local-ubuntu)
-  HELM_SERVICES = $(BACKEND_SERVICES)
-else
-  HELM_SERVICES = $(BACKEND_SERVICES)
-endif
+# Services to deploy via Helm (backend only)
+# Frontend is deployed separately (CDN/S3 or npm run dev locally)
+HELM_SERVICES = $(BACKEND_SERVICES)
 
 helm-deps-build: ## Build all Helm dependencies
 	@echo "Building all Helm dependencies..."

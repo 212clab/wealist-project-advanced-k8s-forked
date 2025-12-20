@@ -114,14 +114,14 @@ _setup-db-debian:
 	@sudo systemctl restart redis-server || sudo systemctl restart redis
 	@echo "Redis ready"
 
-kind-load-images: ## Build/pull all images (infra + services)
+kind-load-images: ## Build/pull all images (infra + backend services)
 	@echo "=== Step 2: Loading all images ==="
 	@echo ""
 	@echo "--- Loading infrastructure images ---"
 	./docker/scripts/dev/1.load_infra_images.sh
 	@echo ""
-	@echo "--- Building service images ---"
-	./docker/scripts/dev/2.build_services_and_load.sh
+	@echo "--- Building backend service images ---"
+	SKIP_FRONTEND=true ./docker/scripts/dev/2.build_services_and_load.sh
 	@echo ""
 	@echo "All images loaded!"
 	@echo ""
@@ -143,8 +143,8 @@ kind-load-images-mono: ## Build Go services with monorepo pattern (faster rebuil
 		docker push $(LOCAL_REGISTRY)/$$svc:$(IMAGE_TAG); \
 	done
 	@echo ""
-	@echo "--- Building auth-service and frontend ---"
-	@$(MAKE) auth-service-load frontend-load
+	@echo "--- Building auth-service ---"
+	@$(MAKE) auth-service-load
 	@echo ""
 	@echo "All images loaded! (Monorepo pattern)"
 	@echo ""
