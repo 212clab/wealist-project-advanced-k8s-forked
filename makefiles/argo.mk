@@ -46,7 +46,7 @@ help: ## 도움말 표시
 	@echo "  SEALED_SECRETS_KEY=$(SEALED_SECRETS_KEY)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-all-simple: cluster-up bootstrap deploy ## 전체 프로세스 (클러스터 → Helm Infra → Bootstrap → 배포)
+all-simple: cluster-up bootstrap ## 전체 프로세스 (클러스터 → Helm Infra → Bootstrap → 배포)
 	@echo ""
 	@echo -e "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo -e "$(GREEN)✅ 전체 배포 완료!$(NC)"
@@ -82,22 +82,6 @@ cluster-up: ## Kind 클러스터 + 로컬 레지스트리 + 이미지 준비
 		cd k8s/installShell && ./0.setup-cluster.sh; \
 	else \
 		echo -e "$(RED)❌ 0.setup-cluster.sh not found$(NC)"; \
-		exit 1; \
-	fi
-	@echo -e "$(YELLOW)📦 Step 2: 인프라 이미지 로드...$(NC)"
-	@if [ -f "k8s/installShell/1.load_infra_images.sh" ]; then \
-		chmod +x k8s/installShell/1.load_infra_images.sh; \
-		cd k8s/installShell && ./1.load_infra_images.sh; \
-	else \
-		echo -e "$(RED)❌ 1.load_infra_images.sh not found$(NC)"; \
-		exit 1; \
-	fi
-	@echo -e "$(YELLOW)🔨 Step 3: 서비스 이미지 빌드 및 로드...$(NC)"
-	@if [ -f "k8s/installShell/2.build_services_and_load.sh" ]; then \
-		chmod +x k8s/installShell/2.build_services_and_load.sh; \
-		cd k8s/installShell && ./2.build_services_and_load.sh; \
-	else \
-		echo -e "$(RED)❌ 2.build_services_and_load.sh not found$(NC)"; \
 		exit 1; \
 	fi
 	@kubectl cluster-info
@@ -165,14 +149,14 @@ bootstrap-without-key: ## 키 없이 Bootstrap (새 키 생성)
 # 배포
 # ============================================
 
-deploy: ## Applications 배포 (Root App 생성)
-	@echo -e "$(YELLOW)🎯 Applications 배포 중...$(NC)"
-	@kubectl apply -f k8s/argocd/apps/project.yaml || true
-	@kubectl apply -f k8s/argocd/apps/root-app.yaml || true
-	@echo -e "$(GREEN)✅ 배포 완료$(NC)"
-	@echo ""
-	@echo "Applications 확인:"
-	@kubectl get applications -n argocd
+# deploy: ## Applications 배포 (Root App 생성)
+# 	@echo -e "$(YELLOW)🎯 Applications 배포 중...$(NC)"
+# 	@kubectl apply -f k8s/argocd/apps/project.yaml || true
+# 	@kubectl apply -f k8s/argocd/apps/root-app.yaml || true
+# 	@echo -e "$(GREEN)✅ 배포 완료$(NC)"
+# 	@echo ""
+# 	@echo "Applications 확인:"
+# 	@kubectl get applications -n argocd
 
 # ============================================
 # 상태 확인
