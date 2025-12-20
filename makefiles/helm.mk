@@ -5,7 +5,7 @@
 ##@ Helm 차트 (권장)
 
 .PHONY: helm-deps-build helm-lint helm-validate
-.PHONY: helm-install-cert-manager helm-install-infra helm-install-services helm-install-monitoring
+.PHONY: helm-install-cert-manager helm-install-infra helm-install-services helm-install-istio-config helm-install-monitoring
 .PHONY: helm-install-all helm-install-all-init helm-upgrade-all helm-uninstall-all
 .PHONY: helm-setup-route53-secret helm-check-secrets helm-check-db
 .PHONY: helm-local-kind helm-local-ubuntu helm-dev helm-staging helm-prod
@@ -246,14 +246,25 @@ endif
 	@echo "  Grafana 로그인: admin / admin"
 	@echo "=============================================="
 
+helm-install-istio-config: ## Istio 설정 설치 (HTTPRoute, DestinationRules 등)
+	@echo "Istio 설정 설치 중 (ENV=$(ENV), NS=$(K8S_NAMESPACE))..."
+	@helm upgrade --install istio-config ./k8s/helm/charts/istio-config \
+		-f $(HELM_BASE_VALUES) \
+		-f $(HELM_ENV_VALUES) \
+		-n $(K8S_NAMESPACE) --wait
+	@echo ""
+	@echo "Istio 설정 설치 완료! (HTTPRoute, PeerAuthentication, DestinationRules)"
+
 # -----------------------------------------------------------------------------
-# helm-install-all: secrets 체크 → 의존성 → 인프라 → 서비스 → 모니터링
+# helm-install-all: secrets 체크 → 의존성 → 인프라 → 서비스 → Istio → 모니터링
 # -----------------------------------------------------------------------------
-# Note: Istio Gateway hostPort 설정은 0.setup-cluster.sh에서 처리됨
-helm-install-all: helm-check-secrets helm-check-db helm-deps-build helm-install-cert-manager helm-install-infra ## 전체 차트 설치 (인프라 + 서비스 + 모니터링)
+# Note: Istio Gateway는 0.setup-cluster.sh에서 생성, HTTPRoute는 여기서 설치
+helm-install-all: helm-check-secrets helm-check-db helm-deps-build helm-install-cert-manager helm-install-infra ## 전체 차트 설치 (인프라 + 서비스 + Istio + 모니터링)
 	@sleep 5
 	@$(MAKE) helm-install-services ENV=$(ENV)
 	@sleep 3
+	@$(MAKE) helm-install-istio-config ENV=$(ENV)
+	@sleep 2
 	@$(MAKE) helm-install-monitoring ENV=$(ENV)
 	@echo ""
 	@echo "=============================================="
