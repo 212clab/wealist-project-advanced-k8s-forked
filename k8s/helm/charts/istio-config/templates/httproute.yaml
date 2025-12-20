@@ -305,3 +305,4 @@ spec:
     - name: frontend
       port: 80
 {{- end }}
+{{- end }}
