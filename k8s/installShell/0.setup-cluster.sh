@@ -131,6 +131,7 @@ kubectl wait --namespace istio-system \
 echo "✅ Istio Ambient 설치 완료"
 
 # 9. Istio Ingress Gateway 설치 (외부 트래픽용)
+# Kind에서 localhost:80 접근을 위해 hostPort 사용
 echo "⏳ Istio Ingress Gateway 설치 중..."
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -138,6 +139,9 @@ kind: Gateway
 metadata:
   name: istio-ingressgateway
   namespace: istio-system
+  annotations:
+    # Kind: ClusterIP + hostPort 방식 사용 (NodePort 불필요)
+    networking.istio.io/service-type: ClusterIP
 spec:
   gatewayClassName: istio
   listeners:
@@ -147,6 +151,10 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+  infrastructure:
+    annotations:
+      # control-plane 노드에 스케줄링 (hostPort 80 사용)
+      traffic.sidecar.istio.io/includeInboundPorts: ""
 EOF
 
 echo "⏳ Istio Gateway Pod 준비 대기 중..."
@@ -156,45 +164,42 @@ kubectl wait --namespace istio-system \
   --selector=gateway.networking.k8s.io/gateway-name=istio-ingressgateway \
   --timeout=120s || echo "WARNING: Istio gateway not ready yet"
 
-# 10. Istio Gateway를 NodePort로 노출 (Kind용)
-echo "⚙️ Istio Gateway NodePort 설정 중..."
-kubectl patch svc istio-ingressgateway -n istio-system --type='json' -p='[
-  {"op": "replace", "path": "/spec/type", "value": "NodePort"},
-  {"op": "replace", "path": "/spec/ports/0/nodePort", "value": 30080}
-]' 2>/dev/null || true
+# 10. Istio Gateway를 hostPort 80으로 노출 (Kind용)
+# Gateway Pod가 직접 노드의 80 포트를 사용하도록 패치
+echo "⚙️ Istio Gateway hostPort 80 설정 중..."
+kubectl patch deployment istio-ingressgateway -n istio-system --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/ports",
+    "value": [
+      {"containerPort": 80, "hostPort": 80, "protocol": "TCP", "name": "http"},
+      {"containerPort": 443, "hostPort": 443, "protocol": "TCP", "name": "https"}
+    ]
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/nodeSelector",
+    "value": {"ingress-ready": "true"}
+  }
+]' 2>/dev/null || echo "Gateway deployment patch skipped (may already be configured)"
 
-# Port 80으로 접근하려면 추가 설정 필요 (Kind 제약)
-# control-plane 노드의 80 포트를 Gateway로 포워딩
-echo "⚙️ Port 80 → Istio Gateway 포워딩 설정..."
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: istio-ingressgateway-nodeport
-  namespace: istio-system
-spec:
-  type: NodePort
-  selector:
-    gateway.networking.k8s.io/gateway-name: istio-ingressgateway
-  ports:
-  - name: http
-    port: 80
-    targetPort: 80
-    nodePort: 30080
-  - name: https
-    port: 443
-    targetPort: 443
-    nodePort: 30443
-EOF
+# Gateway Pod 재시작 대기
+echo "⏳ Gateway Pod 재시작 대기 중..."
+sleep 3
+kubectl wait --namespace istio-system \
+  --for=condition=ready pod \
+  --selector=gateway.networking.k8s.io/gateway-name=istio-ingressgateway \
+  --timeout=120s || echo "WARNING: Istio gateway not ready yet"
 
 echo ""
 echo "✅ 클러스터 준비 완료!"
 echo ""
 echo "📦 로컬 레지스트리: localhost:${REG_PORT}"
-echo "🌐 Istio Gateway: localhost:8080 (NodePort 30080)"
+echo "🌐 Istio Gateway: localhost (hostPort 80)"
 echo ""
 echo "📝 다음 단계:"
 echo "   1. 네임스페이스에 Ambient 모드 활성화:"
 echo "      kubectl label ns <namespace> istio.io/dataplane-mode=ambient"
 echo "   2. HTTPRoute로 서비스 라우팅 설정"
+echo "   3. localhost/svc/{service}/api/... 로 접근"
 echo ""
