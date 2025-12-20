@@ -277,6 +277,101 @@ spec:
     timeouts:
       request: {{ .Values.httpRoute.routes.video.timeout | default "3600s" }}
 
+# =============================================================================
+# Monitoring Routes (Grafana, Prometheus, Loki)
+# =============================================================================
+{{- if .Values.httpRoute.monitoring.enabled }}
+# Grafana Route - handles sub-path internally (GF_SERVER_SERVE_FROM_SUB_PATH=true)
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "istio-config.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ $gatewayName }}
+    namespace: {{ $gatewayNamespace }}
+  hostnames:
+  {{- range .Values.httpRoute.hosts }}
+  - {{ . | quote }}
+  {{- end }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: {{ .Values.httpRoute.monitoring.grafana.prefix }}
+    backendRefs:
+    - name: {{ .Values.httpRoute.monitoring.grafana.host }}
+      port: {{ .Values.httpRoute.monitoring.grafana.port }}
+
+# Prometheus Route - needs rewrite (uses --web.route-prefix=/)
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus-route
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "istio-config.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ $gatewayName }}
+    namespace: {{ $gatewayNamespace }}
+  hostnames:
+  {{- range .Values.httpRoute.hosts }}
+  - {{ . | quote }}
+  {{- end }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: {{ .Values.httpRoute.monitoring.prometheus.prefix }}
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: {{ .Values.httpRoute.monitoring.prometheus.host }}
+      port: {{ .Values.httpRoute.monitoring.prometheus.port }}
+
+# Loki Route - needs rewrite (doesn't support sub-path)
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: loki-route
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "istio-config.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ $gatewayName }}
+    namespace: {{ $gatewayNamespace }}
+  hostnames:
+  {{- range .Values.httpRoute.hosts }}
+  - {{ . | quote }}
+  {{- end }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: {{ .Values.httpRoute.monitoring.loki.prefix }}
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: {{ .Values.httpRoute.monitoring.loki.host }}
+      port: {{ .Values.httpRoute.monitoring.loki.port }}
+{{- end }}
+
 # Frontend Route (catch-all, must have lowest priority)
 # dev 환경에서는 비활성화 (CloudFront/S3에서 서빙)
 {{- if .Values.httpRoute.frontend.enabled }}

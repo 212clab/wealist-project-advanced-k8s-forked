@@ -121,6 +121,21 @@ httpRoute:
   # dev 환경에서는 비활성화 (CloudFront/S3에서 서빙)
   frontend:
     enabled: true  # localhost: true, dev: false
+  # Monitoring routes (Grafana, Prometheus, Loki)
+  monitoring:
+    enabled: true
+    grafana:
+      prefix: /monitoring/grafana
+      host: grafana
+      port: 3000
+    prometheus:
+      prefix: /monitoring/prometheus
+      host: prometheus
+      port: 9090
+    loki:
+      prefix: /monitoring/loki
+      host: loki
+      port: 3100
 
 # =============================================================================
 # mTLS Configuration
