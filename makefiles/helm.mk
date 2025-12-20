@@ -358,7 +358,7 @@ helm-uninstall-all: ## 전체 차트 삭제
 ##@ 환경별 빠른 배포
 
 helm-local-kind: ## 로컬 Kind 클러스터에 배포
-	@$(MAKE) helm-install-all ENV=local-kind
+	@$(MAKE) helm-install-all ENV=localhost
 
 # (레거시) helm-local-ubuntu - helm-staging 또는 helm-dev 사용 권장
 helm-local-ubuntu:
