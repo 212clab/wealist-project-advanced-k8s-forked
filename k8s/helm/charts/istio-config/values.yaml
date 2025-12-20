@@ -3,7 +3,7 @@
 
 # Direct values (used when not using environment files)
 enabled: true
-namespace: wealist-kind-local
+namespace: wealist-localhost
 
 # =============================================================================
 # Gateway Configuration (Istio's own Gateway API - DEPRECATED)

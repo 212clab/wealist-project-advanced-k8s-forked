@@ -82,7 +82,7 @@ make status
 
 # 로그 확인
 make dev-logs                    # Docker Compose
-kubectl logs -f deploy/board-service -n wealist-kind-local  # K8s
+kubectl logs -f deploy/board-service -n wealist-localhost  # K8s
 
 # 서비스 재배포
 make board-service-all           # 빌드 + 로드 + 재배포
@@ -98,10 +98,10 @@ make redeploy-all ENV=local-kind
 ### Pod가 시작되지 않음
 ```bash
 # Pod 상태 확인
-kubectl describe pod -l app=board-service -n wealist-kind-local
+kubectl describe pod -l app=board-service -n wealist-localhost
 
 # 로그 확인
-kubectl logs -f deploy/board-service -n wealist-kind-local
+kubectl logs -f deploy/board-service -n wealist-localhost
 ```
 
 ### 이미지 빌드 실패
@@ -114,7 +114,7 @@ docker build --no-cache -t localhost:5001/board-service:latest \
 ### DB 연결 실패
 ```bash
 # Pod에서 DB 연결 테스트
-kubectl exec -it deploy/board-service -n wealist-kind-local -- \
+kubectl exec -it deploy/board-service -n wealist-localhost -- \
   env | grep DB
 ```
 

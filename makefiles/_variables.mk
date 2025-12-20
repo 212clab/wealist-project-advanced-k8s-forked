@@ -23,7 +23,7 @@ ifeq ($(ENV),localhost)
   DOMAIN = localhost
   PROTOCOL = http
 else ifeq ($(ENV),local-kind)
-  K8S_NAMESPACE = wealist-kind-local
+  K8S_NAMESPACE = wealist-localhost
   DOMAIN = localhost
   PROTOCOL = http
 # DEPRECATED-SOON: local-ubuntu will be replaced by staging
@@ -44,7 +44,7 @@ else ifeq ($(ENV),prod)
   DOMAIN = wealist.co.kr
   PROTOCOL = https
 else
-  K8S_NAMESPACE = wealist-kind-local
+  K8S_NAMESPACE = wealist-localhost
   DOMAIN = localhost
   PROTOCOL = http
 endif
