@@ -152,12 +152,12 @@ shared:
     ENV: "development"
     LOG_LEVEL: "debug"
     CORS_ORIGINS: "*"
-    S3_PUBLIC_ENDPOINT: "http://localhost/minio"
-    LIVEKIT_WS_URL: "ws://localhost/svc/livekit"
+    S3_PUBLIC_ENDPOINT: "http://localhost:8080/minio"
+    LIVEKIT_WS_URL: "ws://localhost:8080/svc/livekit"
 
-    # OAuth2 리다이렉트 URL (localhost, TLS 없음)
-    OAUTH2_CLIENT_REDIRECT_URI: "http://localhost/login/oauth2/code/google"
-    OAUTH2_REDIRECT_URL_ENV: "http://localhost/oauth/callback"
+    # OAuth2 리다이렉트 URL (localhost, Kind NodePort 8080)
+    OAUTH2_CLIENT_REDIRECT_URI: "http://localhost:8080/svc/auth/oauth2/callback/google"
+    OAUTH2_REDIRECT_URL_ENV: "http://localhost:8080/oauth/callback"
 
     # DB 자동 마이그레이션 (내부 DB - 초기 설정 시 활성화)
     DB_AUTO_MIGRATE: "true"
@@ -286,7 +286,7 @@ istio:
 prometheus:
   enabled: true
   config:
-    externalUrl: "http://localhost/monitoring/prometheus"
+    externalUrl: "http://localhost:8080/monitoring/prometheus"
 
 # Grafana - 시각화 대시보드
 grafana:
@@ -296,7 +296,7 @@ grafana:
     port: 3000
   config:
     allowSignUp: false
-    rootUrl: "http://localhost/monitoring/grafana"
+    rootUrl: "http://localhost:8080/monitoring/grafana"
     serveFromSubPath: "true"
 
 # 모니터링 Ingress (nginx - 비활성화)
