@@ -227,12 +227,18 @@ kind-localhost-setup: ## 🏠 통합 환경: 클러스터 생성 → 모든 이�
 # 개별 설정 명령어
 # =============================================================================
 
-kind-setup: ## 클러스터 생성 + Nginx Ingress (권장)
-	@echo "=== Kind 클러스터 + Nginx Ingress 생성 ==="
+kind-setup: ## 클러스터 생성 + Istio Ambient (ENV에 따라 스크립트 선택)
+	@echo "=== Kind 클러스터 + Istio Ambient 생성 (ENV=$(ENV)) ==="
 	@echo ""
-	@echo "외부 DB 사용 시 먼저 'make kind-check-db'로 DB 상태를 확인하세요."
-	@echo ""
-	./k8s/installShell/0.setup-cluster.sh
+ifeq ($(ENV),localhost)
+	./k8s/helm/scripts/localhost/0.setup-cluster.sh
+else ifeq ($(ENV),dev)
+	./k8s/helm/scripts/dev/0.setup-cluster.sh
+else
+	@echo "ENV를 지정하세요: make kind-setup ENV=localhost 또는 ENV=dev"
+	@echo "기본값으로 localhost 스크립트 실행..."
+	./k8s/helm/scripts/localhost/0.setup-cluster.sh
+endif
 	@echo ""
 	@echo "클러스터 준비 완료! 다음: make kind-load-images"
 
