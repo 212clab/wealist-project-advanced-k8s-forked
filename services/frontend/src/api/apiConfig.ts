@@ -31,17 +31,17 @@ const getInjectedApiBaseUrl = (): string | undefined => {
 
 // K8s ingress용 서비스 prefix 매핑
 // ingress가 /svc/{service}/* 로 라우팅하고, rewrite로 prefix 제거
-// 백엔드 basePath를 포함해야 올바른 경로로 도달
+// ⚠️ 프론트엔드 호출이 이미 /api를 포함하면 baseURL에서 제외
 const getIngressServicePrefix = (path: string): string => {
-  if (path?.includes('/api/auth')) return '/svc/auth';            // auth: Java, basePath=/
-  if (path?.includes('/api/users')) return '/svc/user/api';       // user: Go, basePath=/api
-  if (path?.includes('/api/workspaces')) return '/svc/user/api';  // user: Go, basePath=/api
-  if (path?.includes('/api/profiles')) return '/svc/user/api';    // user: Go, basePath=/api
-  if (path?.includes('/api/boards')) return '/svc/board/api';     // board: Go, basePath=/api
-  if (path?.includes('/api/chats')) return '/svc/chat/api/chats'; // chat: Go, basePath=/api/chats
-  if (path?.includes('/api/notifications')) return '/svc/noti/api'; // noti: Go, basePath=/api
-  if (path?.includes('/api/storage')) return '/svc/storage/api';  // storage: Go, basePath=/api
-  if (path?.includes('/api/video')) return '/svc/video/api/video'; // video: Go, basePath=/api/video
+  if (path?.includes('/api/auth')) return '/svc/auth';            // auth: 프론트가 /api/auth 포함
+  if (path?.includes('/api/users')) return '/svc/user';           // user: 프론트가 /api/users 포함
+  if (path?.includes('/api/workspaces')) return '/svc/user';      // user: 프론트가 /api/workspaces 포함
+  if (path?.includes('/api/profiles')) return '/svc/user';        // user: 프론트가 /api/profiles 포함
+  if (path?.includes('/api/boards')) return '/svc/board';         // board: 프론트가 /api/boards 포함
+  if (path?.includes('/api/chats')) return '/svc/chat/api/chats'; // chat: 프론트가 /my만 호출 (basePath 필요)
+  if (path?.includes('/api/notifications')) return '/svc/noti';   // noti: 프론트가 /api/notifications 포함
+  if (path?.includes('/api/storage')) return '/svc/storage';      // storage: 프론트가 /api/storage 포함
+  if (path?.includes('/api/video')) return '/svc/video';          // video: 프론트가 /api/video 포함
   return ''; // 매칭 안 되면 prefix 없이
 };
 
@@ -60,15 +60,16 @@ const getApiBaseUrl = (path: string): string => {
       const localBaseUrl = 'http://localhost:8080';
       // HTTPRoute가 /svc/{service}/ → / 로 리라이트하므로,
       // 백엔드 basePath를 포함해야 올바른 경로로 도달
-      if (path?.includes('/api/auth')) return `${localBaseUrl}/svc/auth`;           // auth: Java, basePath=/
-      if (path?.includes('/api/users')) return `${localBaseUrl}/svc/user/api`;       // user: Go, basePath=/api
-      if (path?.includes('/api/workspaces')) return `${localBaseUrl}/svc/user/api`;  // user: Go, basePath=/api
-      if (path?.includes('/api/profiles')) return `${localBaseUrl}/svc/user/api`;    // user: Go, basePath=/api
-      if (path?.includes('/api/boards')) return `${localBaseUrl}/svc/board/api`;     // board: Go, basePath=/api
-      if (path?.includes('/api/chats')) return `${localBaseUrl}/svc/chat/api/chats`; // chat: Go, basePath=/api/chats
-      if (path?.includes('/api/notifications')) return `${localBaseUrl}/svc/noti/api`; // noti: Go, basePath=/api
-      if (path?.includes('/api/storage')) return `${localBaseUrl}/svc/storage/api`;  // storage: Go, basePath=/api
-      if (path?.includes('/api/video')) return `${localBaseUrl}/svc/video/api/video`; // video: Go, basePath=/api/video
+      // ⚠️ 단, 프론트엔드 호출이 이미 /api를 포함하면 baseURL에서 제외
+      if (path?.includes('/api/auth')) return `${localBaseUrl}/svc/auth`;           // auth: Java, 프론트가 /api/auth 포함
+      if (path?.includes('/api/users')) return `${localBaseUrl}/svc/user`;          // user: 프론트가 /api/users 포함
+      if (path?.includes('/api/workspaces')) return `${localBaseUrl}/svc/user`;     // user: 프론트가 /api/workspaces 포함
+      if (path?.includes('/api/profiles')) return `${localBaseUrl}/svc/user`;       // user: 프론트가 /api/profiles 포함
+      if (path?.includes('/api/boards')) return `${localBaseUrl}/svc/board`;        // board: 프론트가 /api/boards 포함
+      if (path?.includes('/api/chats')) return `${localBaseUrl}/svc/chat/api/chats`; // chat: 프론트가 /my만 호출 (basePath 필요)
+      if (path?.includes('/api/notifications')) return `${localBaseUrl}/svc/noti`;  // noti: 프론트가 /api/notifications 포함
+      if (path?.includes('/api/storage')) return `${localBaseUrl}/svc/storage`;     // storage: 프론트가 /api/storage 포함
+      if (path?.includes('/api/video')) return `${localBaseUrl}/svc/video`;         // video: 프론트가 /api/video 포함
       return localBaseUrl;
     }
     return getIngressServicePrefix(path);
