@@ -207,24 +207,64 @@ istio:
       - "localhost"
       - "*"
 
+  # mTLS - 서비스 간 암호화
   mtls:
     enabled: true
-    mode: PERMISSIVE  # mTLS와 일반 HTTP 모두 허용
+    mode: PERMISSIVE  # 개발 환경: mTLS + 일반 HTTP 모두 허용
 
+  # 트래픽 제어 - Circuit Breaker, Connection Pool
   destinationRules:
     enabled: true
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 10s
+      http:
+        h2UpgradePolicy: DO_NOT_UPGRADE
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 100
+        maxRetries: 3
+    # Circuit Breaker - 장애 서비스 격리
+    outlierDetection:
+      consecutive5xxErrors: 5
+      consecutiveGatewayErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
 
+  # 서비스 간 통신 제어
+  # localhost: 개발 편의를 위해 완화된 정책
+  # dev/prod: Zero Trust (denyAll: true) 적용
   authorizationPolicy:
     enabled: true
-    denyAll: false
+    denyAll: false  # localhost: 기본 허용 (개발 편의)
 
+  # 서비스별 호출 권한 (L7 정책)
+  serviceAuthorization:
+    enabled: false  # localhost: 비활성화 (개발 편의)
+
+  # JWT 인증
+  # localhost: 비활성화 (서비스가 직접 처리)
+  # dev/prod: Istio에서 JWT 검증
   jwtAuth:
     enabled: false
 
+  # Ambient 모드 (Sidecar-less)
+  ambient:
+    enabled: true
+    waypoint:
+      enabled: true
+      name: wealist-waypoint
+
+  # 텔레메트리 - 트레이싱, 로깅
   telemetry:
     tracing:
       enabled: true
-      samplingPercentage: 100
+      samplingPercentage: 100  # 개발환경 100%, 프로덕션 1-10%
     accessLogging:
       enabled: true
 
