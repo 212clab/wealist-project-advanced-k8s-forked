@@ -31,16 +31,17 @@ const getInjectedApiBaseUrl = (): string | undefined => {
 
 // K8s ingress용 서비스 prefix 매핑
 // ingress가 /svc/{service}/* 로 라우팅하고, rewrite로 prefix 제거
+// 백엔드 basePath를 포함해야 올바른 경로로 도달
 const getIngressServicePrefix = (path: string): string => {
-  if (path?.includes('/api/auth')) return '/svc/auth/api/auth';
-  if (path?.includes('/api/users')) return '/svc/user';
-  if (path?.includes('/api/workspaces')) return '/svc/user';
-  if (path?.includes('/api/profiles')) return '/svc/user';
-  if (path?.includes('/api/boards')) return '/svc/board/api';
-  if (path?.includes('/api/chats')) return `/svc/chat${path}`;
-  if (path?.includes('/api/notifications')) return '/svc/noti';
-  if (path?.includes('/api/storage')) return '/svc/storage/api';
-  if (path?.includes('/api/video')) return '/svc/video';
+  if (path?.includes('/api/auth')) return '/svc/auth';            // auth: Java, basePath=/
+  if (path?.includes('/api/users')) return '/svc/user/api';       // user: Go, basePath=/api
+  if (path?.includes('/api/workspaces')) return '/svc/user/api';  // user: Go, basePath=/api
+  if (path?.includes('/api/profiles')) return '/svc/user/api';    // user: Go, basePath=/api
+  if (path?.includes('/api/boards')) return '/svc/board/api';     // board: Go, basePath=/api
+  if (path?.includes('/api/chats')) return '/svc/chat/api/chats'; // chat: Go, basePath=/api/chats
+  if (path?.includes('/api/notifications')) return '/svc/noti/api'; // noti: Go, basePath=/api
+  if (path?.includes('/api/storage')) return '/svc/storage/api';  // storage: Go, basePath=/api
+  if (path?.includes('/api/video')) return '/svc/video/api/video'; // video: Go, basePath=/api/video
   return ''; // 매칭 안 되면 prefix 없이
 };
 
@@ -57,15 +58,17 @@ const getApiBaseUrl = (path: string): string => {
     // /svc/{service}/* 경로로 라우팅 (포트 8080)
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       const localBaseUrl = 'http://localhost:8080';
-      if (path?.includes('/api/auth')) return `${localBaseUrl}/svc/auth`;
-      if (path?.includes('/api/users')) return `${localBaseUrl}/svc/user`;
-      if (path?.includes('/api/workspaces')) return `${localBaseUrl}/svc/user`;
-      if (path?.includes('/api/profiles')) return `${localBaseUrl}/svc/user`;
-      if (path?.includes('/api/boards')) return `${localBaseUrl}/svc/board`;
-      if (path?.includes('/api/chats')) return `${localBaseUrl}/svc/chat`;
-      if (path?.includes('/api/notifications')) return `${localBaseUrl}/svc/noti`;
-      if (path?.includes('/api/storage')) return `${localBaseUrl}/svc/storage`;
-      if (path?.includes('/api/video')) return `${localBaseUrl}/svc/video`;
+      // HTTPRoute가 /svc/{service}/ → / 로 리라이트하므로,
+      // 백엔드 basePath를 포함해야 올바른 경로로 도달
+      if (path?.includes('/api/auth')) return `${localBaseUrl}/svc/auth`;           // auth: Java, basePath=/
+      if (path?.includes('/api/users')) return `${localBaseUrl}/svc/user/api`;       // user: Go, basePath=/api
+      if (path?.includes('/api/workspaces')) return `${localBaseUrl}/svc/user/api`;  // user: Go, basePath=/api
+      if (path?.includes('/api/profiles')) return `${localBaseUrl}/svc/user/api`;    // user: Go, basePath=/api
+      if (path?.includes('/api/boards')) return `${localBaseUrl}/svc/board/api`;     // board: Go, basePath=/api
+      if (path?.includes('/api/chats')) return `${localBaseUrl}/svc/chat/api/chats`; // chat: Go, basePath=/api/chats
+      if (path?.includes('/api/notifications')) return `${localBaseUrl}/svc/noti/api`; // noti: Go, basePath=/api
+      if (path?.includes('/api/storage')) return `${localBaseUrl}/svc/storage/api`;  // storage: Go, basePath=/api
+      if (path?.includes('/api/video')) return `${localBaseUrl}/svc/video/api/video`; // video: Go, basePath=/api/video
       return localBaseUrl;
     }
     return getIngressServicePrefix(path);
