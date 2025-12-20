@@ -70,12 +70,10 @@ minio-data/
 # ============================================
 # File Uploads (Local Development)
 # ============================================
+# 루트 레벨 업로드 폴더만 무시 (components/storage 제외)
 /uploads/
 /storage/
 /files/
-uploads/
-storage/
-files/
 
 # ============================================
 # Go

@@ -57,11 +57,13 @@ for service in "${BACKEND_SERVICES[@]}"; do
 
     # Dockerfile 확인 (루트 또는 docker/ 하위)
     if [ -f "${SERVICE_PATH}/Dockerfile" ]; then
+        # 서비스 루트에 Dockerfile이 있으면 서비스 폴더를 컨텍스트로
         docker build -t "${LOCAL_REG}/${service}:${TAG}" "${SERVICE_PATH}"
         docker push "${LOCAL_REG}/${service}:${TAG}"
         echo "✅ ${service} 푸시 완료"
     elif [ -f "${SERVICE_PATH}/docker/Dockerfile" ]; then
-        docker build -t "${LOCAL_REG}/${service}:${TAG}" -f "${SERVICE_PATH}/docker/Dockerfile" "${SERVICE_PATH}"
+        # docker/ 하위에 Dockerfile이 있으면 프로젝트 루트를 컨텍스트로 (Go 모노레포)
+        docker build -t "${LOCAL_REG}/${service}:${TAG}" -f "${SERVICE_PATH}/docker/Dockerfile" .
         docker push "${LOCAL_REG}/${service}:${TAG}"
         echo "✅ ${service} 푸시 완료"
     else
