@@ -69,7 +69,7 @@ postgres:
     enabled: false
 
   image:
-    repository: localhost:5001/postgres
+    repository: postgres
     tag: "15-alpine"
     pullPolicy: IfNotPresent
 
@@ -97,7 +97,7 @@ redis:
     enabled: false
 
   image:
-    repository: localhost:5001/redis
+    repository: redis
     tag: "7-alpine"
     pullPolicy: IfNotPresent
 
@@ -126,7 +126,7 @@ frontend:
   enabled: true
 
   image:
-    repository: localhost:5001/frontend
+    repository: frontend
     tag: "latest"
     pullPolicy: Always
 

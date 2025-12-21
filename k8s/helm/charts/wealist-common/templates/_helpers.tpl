@@ -46,7 +46,6 @@ app.kubernetes.io/env: {{ .Values.global.environment }}
 Selector labels
 */}}
 {{- define "wealist-common.selectorLabels" -}}
-app: {{ include "wealist-common.name" . }}
 app.kubernetes.io/name: {{ include "wealist-common.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

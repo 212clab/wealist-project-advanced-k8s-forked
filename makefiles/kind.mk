@@ -293,7 +293,7 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → 서비스 이미�
 	@echo "  3단계: 서비스 이미지 로드 (Backend + Frontend)"
 	@echo "----------------------------------------------"
 	@./k8s/helm/scripts/dev/1.load_infra_images.sh
-	@./k8s/helm/scripts/dev/2.build_all_and_load.sh
+	@./k8s/helm/scripts/dev/2.build_services_and_load.sh
 	@echo ""
 	@echo "=============================================="
 	@echo "  🎉 개발 환경 설정 완료!"

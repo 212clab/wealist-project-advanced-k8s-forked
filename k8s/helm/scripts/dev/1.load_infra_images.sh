@@ -1,65 +1,44 @@
 #!/bin/bash
-# 인프라 이미지를 로컬 레지스트리에 푸시
-# 이미 로컬 레지스트리에 있으면 스킵
+# =============================================================================
+# 인프라 이미지 확인 (dev 환경 - GHCR)
+# =============================================================================
+# dev 환경은 외부 DB (AWS RDS/ElastiCache)를 사용하므로
+# PostgreSQL/Redis 이미지 로드가 필요 없습니다.
 #
-# 환경 변수:
-#   SKIP_DB=true  - PostgreSQL/Redis 이미지 스킵 (외부 DB 사용 시)
+# 이 스크립트는 GHCR 연결 확인용으로만 사용됩니다.
 
 set -e
 
-LOCAL_REG="localhost:5001"
+GHCR_REGISTRY="ghcr.io/orangescloud"
 
-echo "=== 인프라 이미지 → 로컬 레지스트리 (dev 환경) ==="
+echo "=== dev 환경 인프라 확인 (GHCR) ==="
 echo ""
-if [ "${SKIP_DB}" = "true" ]; then
-    echo "※ 로드할 이미지 (SKIP_DB=true):"
-    echo "  - LiveKit Server v1.5"
-    echo "  (PostgreSQL/Redis는 호스트 PC 사용)"
+echo "📦 Registry: ${GHCR_REGISTRY}"
+echo ""
+echo "ℹ️  dev 환경 구성:"
+echo "   - PostgreSQL: AWS RDS (외부)"
+echo "   - Redis: AWS ElastiCache (외부)"
+echo "   - Frontend: S3 + CloudFront (CDN)"
+echo "   - Backend: GHCR 이미지 → EKS"
+echo ""
+
+# GHCR 인증 확인
+echo "🔐 GHCR 인증 확인 중..."
+if docker pull ${GHCR_REGISTRY}/auth-service:latest 2>/dev/null; then
+    echo "✅ GHCR 접근 가능"
 else
-    echo "※ 로드할 이미지:"
-    echo "  - PostgreSQL 15 (alpine)"
-    echo "  - Redis 7 (alpine)"
-    echo "  - LiveKit Server v1.5"
+    echo "⚠️  GHCR 접근 불가 - 로그인이 필요할 수 있습니다."
+    echo ""
+    echo "   GHCR 로그인:"
+    echo "   echo \$GHCR_TOKEN | docker login ghcr.io -u \$GHCR_USERNAME --password-stdin"
 fi
-echo ""
-
-# 레지스트리 확인
-if ! curl -s "http://${LOCAL_REG}/v2/" > /dev/null 2>&1; then
-    echo "ERROR: 레지스트리 없음. make kind-setup 먼저 실행"
-    exit 1
-fi
-
-# 로컬 레지스트리에 이미지 있는지 확인
-image_exists() {
-    local name=$1 tag=$2
-    curl -sf "http://${LOCAL_REG}/v2/${name}/manifests/${tag}" > /dev/null 2>&1
-}
-
-load() {
-    local src=$1 name=$2 tag=$3
-
-    if image_exists "$name" "$tag"; then
-        echo "✓ ${name}:${tag} - 이미 있음 (스킵)"
-        return
-    fi
-
-    echo "$src → ${LOCAL_REG}/${name}:${tag}"
-    docker pull --platform linux/amd64 "$src"
-    docker tag "$src" "${LOCAL_REG}/${name}:${tag}"
-    docker push "${LOCAL_REG}/${name}:${tag}"
-}
-
-# AWS ECR Public (무료) - DB 이미지
-if [ "${SKIP_DB}" != "true" ]; then
-    load "public.ecr.aws/docker/library/postgres:15-alpine" "postgres" "15-alpine"
-    load "public.ecr.aws/docker/library/redis:7-alpine" "redis" "7-alpine"
-else
-    echo "⏭ postgres:15-alpine - 외부 DB 사용으로 스킵"
-    echo "⏭ redis:7-alpine - 외부 DB 사용으로 스킵"
-fi
-
-# Docker Hub - LiveKit (실시간 통신)
-load "livekit/livekit-server:v1.5" "livekit" "v1.5"
 
 echo ""
-echo "완료!"
+echo "✅ 인프라 확인 완료!"
+echo ""
+echo "📝 다음 단계:"
+echo "   1. 서비스 이미지 빌드 및 GHCR 푸시:"
+echo "      ./2.build_and_push_ghcr.sh"
+echo ""
+echo "   2. Helm 배포:"
+echo "      make helm-install-all ENV=dev"

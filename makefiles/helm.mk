@@ -5,10 +5,10 @@
 ##@ Helm 차트 (권장)
 
 .PHONY: helm-deps-build helm-lint helm-validate
-.PHONY: helm-install-cert-manager helm-install-infra helm-install-services helm-install-istio-config helm-install-monitoring
+.PHONY: helm-install-cert-manager helm-install-infra helm-install-services helm-install-frontend helm-install-istio-config helm-install-monitoring
 .PHONY: helm-install-all helm-install-all-init helm-upgrade-all helm-uninstall-all
 .PHONY: helm-setup-route53-secret helm-check-secrets helm-check-db
-.PHONY: helm-local-kind helm-local-ubuntu helm-dev helm-staging helm-prod
+.PHONY: helm-localhost helm-local-ubuntu helm-dev helm-staging helm-prod
 
 # Helm으로 배포할 서비스 목록 (백엔드만)
 # 프론트엔드는 별도 배포 (CDN/S3 또는 npm run dev)
@@ -21,6 +21,7 @@ helm-deps-build: ## 모든 Helm 의존성 빌드
 		echo "$$chart 의존성 업데이트 중..."; \
 		helm dependency update ./k8s/helm/charts/$$chart; \
 	done
+	@helm dependency update ./k8s/helm/charts/frontend 2>/dev/null || true
 	@helm dependency update ./k8s/helm/charts/wealist-infrastructure
 	@helm dependency update ./k8s/helm/charts/cert-manager-config 2>/dev/null || true
 	@echo "모든 의존성 빌드 완료!"
@@ -164,7 +165,7 @@ helm-install-infra: ## 인프라 차트 설치 (EXTERNAL_DB가 DB 배포 결정)
 	@echo "인프라 설치 중 (ENV=$(ENV), NS=$(K8S_NAMESPACE), EXTERNAL_DB=$(EXTERNAL_DB))..."
 ifeq ($(EXTERNAL_DB),true)
 	@echo "외부 데이터베이스 사용 중 (호스트 머신의 PostgreSQL/Redis)"
-	helm install wealist-infrastructure ./k8s/helm/charts/wealist-infrastructure \
+	helm upgrade --install wealist-infrastructure ./k8s/helm/charts/wealist-infrastructure \
 		-f $(HELM_BASE_VALUES) \
 		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		--set postgres.enabled=false \
@@ -176,7 +177,7 @@ ifeq ($(EXTERNAL_DB),true)
 		-n $(K8S_NAMESPACE) --create-namespace
 else
 	@echo "내부 데이터베이스 사용 중 (클러스터 내 PostgreSQL/Redis 파드)"
-	helm install wealist-infrastructure ./k8s/helm/charts/wealist-infrastructure \
+	helm upgrade --install wealist-infrastructure ./k8s/helm/charts/wealist-infrastructure \
 		-f $(HELM_BASE_VALUES) \
 		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		--set postgres.enabled=true \
@@ -194,7 +195,7 @@ ifeq ($(EXTERNAL_DB),true)
 	@echo "EXTERNAL_DB=true: 기존 외부 DB 사용, auto-migrate 건너뜀"
 	@for service in $(HELM_SERVICES); do \
 		echo "$$service 설치 중..."; \
-		helm install $$service ./k8s/helm/charts/$$service \
+		helm upgrade --install $$service ./k8s/helm/charts/$$service \
 			-f $(HELM_BASE_VALUES) \
 			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 			-n $(K8S_NAMESPACE); \
@@ -203,7 +204,7 @@ else
 	@echo "EXTERNAL_DB=false: 내부 DB 파드 사용, auto-migrate 활성화"
 	@for service in $(HELM_SERVICES); do \
 		echo "$$service (DB auto-migrate 포함) 설치 중..."; \
-		helm install $$service ./k8s/helm/charts/$$service \
+		helm upgrade --install $$service ./k8s/helm/charts/$$service \
 			-f $(HELM_BASE_VALUES) \
 			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 			--set shared.config.DB_AUTO_MIGRATE=true \
@@ -214,18 +215,31 @@ endif
 	@echo ""
 	@echo "다음: make status"
 
+helm-install-frontend: ## 프론트엔드 설치 (localhost.yaml에서 frontend.enabled=true인 경우)
+	@echo "프론트엔드 설정 확인 중 (ENV=$(ENV))..."
+	@if grep -A1 "^frontend:" "$(HELM_ENV_VALUES)" 2>/dev/null | grep -q "enabled: true"; then \
+		echo "frontend 설치 중..."; \
+		helm upgrade --install frontend ./k8s/helm/charts/frontend \
+			-f $(HELM_BASE_VALUES) \
+			-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
+			-n $(K8S_NAMESPACE); \
+		echo "프론트엔드 설치 완료!"; \
+	else \
+		echo "프론트엔드 건너뜀 ($(ENV) 환경에서 비활성화됨)"; \
+	fi
+
 helm-install-monitoring: ## 모니터링 스택 설치 (Prometheus, Loki, Grafana)
 	@echo "모니터링 스택 설치 중 (ENV=$(ENV), NS=$(K8S_NAMESPACE), EXTERNAL_DB=$(EXTERNAL_DB))..."
 ifeq ($(EXTERNAL_DB),true)
 	@echo "외부 데이터베이스 exporter 사용 (host: 172.18.0.1)"
-	helm install wealist-monitoring ./k8s/helm/charts/wealist-monitoring \
+	helm upgrade --install wealist-monitoring ./k8s/helm/charts/wealist-monitoring \
 		-f $(HELM_BASE_VALUES) \
 		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		--set global.namespace=$(K8S_NAMESPACE) \
 		-n $(K8S_NAMESPACE)
 else
 	@echo "내부 데이터베이스 exporter 사용 (host: postgres/redis 서비스)"
-	helm install wealist-monitoring ./k8s/helm/charts/wealist-monitoring \
+	helm upgrade --install wealist-monitoring ./k8s/helm/charts/wealist-monitoring \
 		-f $(HELM_BASE_VALUES) \
 		-f $(HELM_ENV_VALUES) $(HELM_SECRETS_FLAG) \
 		--set global.namespace=$(K8S_NAMESPACE) \
@@ -259,9 +273,11 @@ helm-install-istio-config: ## Istio 설정 설치 (HTTPRoute, DestinationRules �
 # helm-install-all: secrets 체크 → 의존성 → 인프라 → 서비스 → Istio → 모니터링
 # -----------------------------------------------------------------------------
 # Note: Istio Gateway는 0.setup-cluster.sh에서 생성, HTTPRoute는 여기서 설치
-helm-install-all: helm-check-secrets helm-check-db helm-deps-build helm-install-cert-manager helm-install-infra ## 전체 차트 설치 (인프라 + 서비스 + Istio + 모니터링)
+helm-install-all: helm-check-secrets helm-check-db helm-deps-build helm-install-cert-manager helm-install-infra ## 전체 차트 설치 (인프라 + 서비스 + 프론트엔드 + Istio + 모니터링)
 	@sleep 5
 	@$(MAKE) helm-install-services ENV=$(ENV)
+	@sleep 2
+	@$(MAKE) helm-install-frontend ENV=$(ENV)
 	@sleep 3
 	@$(MAKE) helm-install-istio-config ENV=$(ENV)
 	@sleep 2
@@ -369,7 +385,7 @@ helm-uninstall-all: ## 전체 차트 삭제
 
 ##@ 환경별 빠른 배포
 
-helm-local-kind: ## 로컬 Kind 클러스터에 배포
+helm-localhost: ## 로컬 Kind 클러스터에 배포
 	@$(MAKE) helm-install-all ENV=localhost
 
 # (레거시) helm-local-ubuntu - helm-staging 또는 helm-dev 사용 권장
