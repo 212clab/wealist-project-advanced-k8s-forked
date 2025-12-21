@@ -177,24 +177,42 @@ load_to_kind() {
 
     # 방법 3: 노드에 직접 ctr import (최후의 수단)
     # Kind 노드의 containerd에 직접 이미지 로드
-    local node="${CLUSTER_NAME}-control-plane"
-    echo "     Loading directly to node: $node"
+    # 중요: 모든 노드(control-plane + workers)에 로드해야 함
+    local nodes=("${CLUSTER_NAME}-control-plane" "${CLUSTER_NAME}-worker" "${CLUSTER_NAME}-worker2")
+    local loaded=false
 
-    # gunzip 없이 직접 import
-    if docker exec -i "$node" ctr --namespace=k8s.io images import - < "$tar_file" 2>/dev/null; then
-        rm -f "$tar_file"
+    for node in "${nodes[@]}"; do
+        # 노드 존재 여부 확인
+        if ! docker inspect "$node" &>/dev/null; then
+            continue
+        fi
+
+        echo "     Loading to node: $node"
+        if docker exec -i "$node" ctr --namespace=k8s.io images import - < "$tar_file" 2>/dev/null; then
+            echo "       ✅ $node 로드 완료"
+            loaded=true
+        else
+            echo "       ⚠️  $node 로드 실패"
+        fi
+    done
+
+    rm -f "$tar_file"
+
+    if [ "$loaded" = true ]; then
         echo "     ✅ 로드 완료 (direct ctr import)"
         return 0
     fi
 
     # 모든 방법 실패
-    rm -f "$tar_file"
     echo "     ❌ 이미지 로드 실패: $image"
     echo ""
     echo "     수동 로드 방법:"
     echo "       docker pull $image"
     echo "       docker save $image -o /tmp/image.tar"
-    echo "       docker exec -i ${CLUSTER_NAME}-control-plane ctr -n k8s.io images import - < /tmp/image.tar"
+    echo "       # 모든 노드에 로드 필요:"
+    echo "       for node in ${CLUSTER_NAME}-control-plane ${CLUSTER_NAME}-worker ${CLUSTER_NAME}-worker2; do"
+    echo "         docker exec -i \$node ctr -n k8s.io images import - < /tmp/image.tar"
+    echo "       done"
     echo ""
     return 1
 }
