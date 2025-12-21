@@ -548,10 +548,12 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → 서비스 이미�
 	echo "  - GitHub → Settings → Developer settings → Personal access tokens"; \
 	echo "  - 권한: read:packages (최소)"; \
 	echo ""; \
-	echo "GitHub 사용자명을 입력하세요:"; \
-	read -r GITHUB_USER; \
-	echo "GitHub Personal Access Token을 입력하세요:"; \
-	read -rs GITHUB_TOKEN; \
+	printf "GitHub 사용자명: "; \
+	read GITHUB_USER; \
+	printf "GitHub Personal Access Token: "; \
+	stty -echo 2>/dev/null || true; \
+	read GITHUB_TOKEN; \
+	stty echo 2>/dev/null || true; \
 	echo ""; \
 	echo "GHCR 로그인 중..."; \
 	if echo "$$GITHUB_TOKEN" | docker login ghcr.io -u "$$GITHUB_USER" --password-stdin; then \
