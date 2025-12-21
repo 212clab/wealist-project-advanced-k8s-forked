@@ -83,7 +83,7 @@
       "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1},
       "id": 6,
       "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "workspaces_total or vector(0)", "legendFormat": "", "refId": "A"}],
+      "targets": [{"expr": "user_service_workspaces_total or vector(0)", "legendFormat": "", "refId": "A"}],
       "title": "전체 워크스페이스",
       "type": "stat"
     },
@@ -357,7 +357,7 @@
       "id": 23,
       "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
-        {"expr": "round(sum(increase(workspaces_created_total[1d]))) or vector(0)", "legendFormat": "워크스페이스 생성", "refId": "A"}
+        {"expr": "round(sum(increase(user_service_workspace_created_total[1d]))) or vector(0)", "legendFormat": "워크스페이스 생성", "refId": "A"}
       ],
       "title": "워크스페이스 생성 추이",
       "type": "timeseries"
@@ -375,7 +375,7 @@
       "id": 24,
       "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
-        {"expr": "workspaces_total or vector(0)", "legendFormat": "전체 워크스페이스", "refId": "A"}
+        {"expr": "user_service_workspaces_total or vector(0)", "legendFormat": "전체 워크스페이스", "refId": "A"}
       ],
       "title": "전체 워크스페이스 수 추이",
       "type": "timeseries"
