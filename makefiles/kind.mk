@@ -4,7 +4,9 @@
 
 ##@ Kubernetes (Kind)
 
-.PHONY: kind-setup kind-setup-simple kind-setup-db kind-check-db kind-check-db-setup kind-localhost-setup kind-load-images kind-load-images-ex-db kind-load-images-all kind-load-images-mono kind-delete kind-recover
+.PHONY: kind-setup kind-setup-simple kind-setup-db kind-check-db kind-check-db-setup kind-localhost-setup kind-delete kind-recover
+.PHONY: kind-load-images kind-load-images-ex-db kind-load-images-all kind-load-images-mono
+.PHONY: kind-load-infra kind-load-monitoring kind-load-services
 .PHONY: _setup-db-macos _setup-db-debian _check-db-installed
 
 # =============================================================================
@@ -1223,6 +1225,26 @@ kind-load-images-mono: ## Go 서비스를 모노레포 패턴으로 빌드 (더 
 	@echo "모든 이미지 로드 완료! (모노레포 패턴)"
 	@echo ""
 	@echo "다음: make helm-install-all ENV=dev"
+
+# =============================================================================
+# 개별 이미지 로드 명령어 (세분화)
+# =============================================================================
+
+kind-load-infra: ## 🔧 인프라 이미지만 로드 (MinIO, LiveKit)
+	@echo "=== 인프라 이미지 로드 ==="
+	ONLY_INFRA=true ./k8s/helm/scripts/dev/1.load_infra_images.sh
+
+kind-load-monitoring: ## 📊 모니터링 이미지만 로드 (Prometheus, Grafana, Loki, Exporters)
+	@echo "=== 모니터링 이미지 로드 ==="
+	ONLY_MONITORING=true ./k8s/helm/scripts/dev/1.load_infra_images.sh
+
+kind-load-services: ## 🚀 서비스 이미지만 로드 (Backend 서비스)
+	@echo "=== 서비스 이미지 로드 ==="
+	@echo ""
+	@echo "--- 백엔드 서비스 이미지 빌드 중 ---"
+	SKIP_FRONTEND=true ./k8s/helm/scripts/dev/2.build_services_and_load.sh
+	@echo ""
+	@echo "서비스 이미지 로드 완료!"
 
 kind-delete: ## 클러스터 삭제
 	@echo "Kind 클러스터 삭제 중..."

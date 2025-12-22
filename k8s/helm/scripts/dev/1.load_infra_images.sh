@@ -7,6 +7,12 @@
 # - MinIO, LiveKit: 클러스터 내 Pod로 실행
 # - 모니터링: Prometheus, Grafana, Loki, Promtail, Exporters
 # - Backend: GHCR에서 pull
+#
+# 환경변수:
+#   SKIP_INFRA=true      - 인프라 이미지(MinIO, LiveKit) 건너뛰기
+#   SKIP_MONITORING=true - 모니터링 이미지 건너뛰기
+#   ONLY_INFRA=true      - 인프라 이미지만 로드
+#   ONLY_MONITORING=true - 모니터링 이미지만 로드
 
 # set -e 제거 - 개별 이미지 실패해도 계속 진행
 
@@ -260,59 +266,75 @@ load_image_with_fallback() {
     load_to_kind "${ghcr_image}:latest"
 }
 
-# MinIO - S3 호환 스토리지
-load_image_with_fallback \
-    "${GHCR_BASE}/minio-latest" \
-    "minio/minio:latest" \
-    "MinIO"
+# =============================================================================
+# 인프라 이미지 로드 (SKIP_INFRA, ONLY_MONITORING으로 건너뛰기 가능)
+# =============================================================================
+if [ "${SKIP_INFRA}" != "true" ] && [ "${ONLY_MONITORING}" != "true" ]; then
+    echo ""
+    echo "--- 인프라 이미지 로드 ---"
 
-# LiveKit - 실시간 통신
-load_image_with_fallback \
-    "${GHCR_BASE}/livekit-server-latest" \
-    "livekit/livekit-server:latest" \
-    "LiveKit"
+    # MinIO - S3 호환 스토리지
+    load_image_with_fallback \
+        "${GHCR_BASE}/minio-latest" \
+        "minio/minio:latest" \
+        "MinIO"
+
+    # LiveKit - 실시간 통신
+    load_image_with_fallback \
+        "${GHCR_BASE}/livekit-server-latest" \
+        "livekit/livekit-server:latest" \
+        "LiveKit"
+else
+    echo ""
+    echo "--- 인프라 이미지 건너뜀 (SKIP_INFRA=${SKIP_INFRA:-false}, ONLY_MONITORING=${ONLY_MONITORING:-false}) ---"
+fi
 
 # =============================================================================
-# 모니터링 이미지 (GHCR 미러 우선, Docker Hub fallback)
+# 모니터링 이미지 (SKIP_MONITORING, ONLY_INFRA로 건너뛰기 가능)
 # =============================================================================
-echo ""
-echo "--- 모니터링 이미지 로드 ---"
+if [ "${SKIP_MONITORING}" != "true" ] && [ "${ONLY_INFRA}" != "true" ]; then
+    echo ""
+    echo "--- 모니터링 이미지 로드 ---"
 
-# Prometheus - 메트릭 수집
-load_image_with_fallback \
-    "${GHCR_BASE}/prometheus-v2.48.0" \
-    "prom/prometheus:v2.48.0" \
-    "Prometheus"
+    # Prometheus - 메트릭 수집
+    load_image_with_fallback \
+        "${GHCR_BASE}/prometheus-v2.48.0" \
+        "prom/prometheus:v2.48.0" \
+        "Prometheus"
 
-# Grafana - 시각화
-load_image_with_fallback \
-    "${GHCR_BASE}/grafana-10.2.2" \
-    "grafana/grafana:10.2.2" \
-    "Grafana"
+    # Grafana - 시각화
+    load_image_with_fallback \
+        "${GHCR_BASE}/grafana-10.2.2" \
+        "grafana/grafana:10.2.2" \
+        "Grafana"
 
-# Loki - 로그 수집
-load_image_with_fallback \
-    "${GHCR_BASE}/loki-2.9.2" \
-    "grafana/loki:2.9.2" \
-    "Loki"
+    # Loki - 로그 수집
+    load_image_with_fallback \
+        "${GHCR_BASE}/loki-2.9.2" \
+        "grafana/loki:2.9.2" \
+        "Loki"
 
-# Promtail - 로그 수집 에이전트
-load_image_with_fallback \
-    "${GHCR_BASE}/promtail-2.9.2" \
-    "grafana/promtail:2.9.2" \
-    "Promtail"
+    # Promtail - 로그 수집 에이전트
+    load_image_with_fallback \
+        "${GHCR_BASE}/promtail-2.9.2" \
+        "grafana/promtail:2.9.2" \
+        "Promtail"
 
-# PostgreSQL Exporter - DB 메트릭
-load_image_with_fallback \
-    "${GHCR_BASE}/postgres-exporter-v0.15.0" \
-    "prometheuscommunity/postgres-exporter:v0.15.0" \
-    "PostgreSQL Exporter"
+    # PostgreSQL Exporter - DB 메트릭
+    load_image_with_fallback \
+        "${GHCR_BASE}/postgres-exporter-v0.15.0" \
+        "prometheuscommunity/postgres-exporter:v0.15.0" \
+        "PostgreSQL Exporter"
 
-# Redis Exporter - 캐시 메트릭
-load_image_with_fallback \
-    "${GHCR_BASE}/redis_exporter-v1.55.0" \
-    "oliver006/redis_exporter:v1.55.0" \
-    "Redis Exporter"
+    # Redis Exporter - 캐시 메트릭
+    load_image_with_fallback \
+        "${GHCR_BASE}/redis_exporter-v1.55.0" \
+        "oliver006/redis_exporter:v1.55.0" \
+        "Redis Exporter"
+else
+    echo ""
+    echo "--- 모니터링 이미지 건너뜀 (SKIP_MONITORING=${SKIP_MONITORING:-false}, ONLY_INFRA=${ONLY_INFRA:-false}) ---"
+fi
 
 echo ""
 echo "✅ 인프라 이미지 로드 완료!"
