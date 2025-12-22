@@ -132,10 +132,16 @@ create_databases() {
         log_info "Processing: $db_name -> $db_user"
 
         # Create user if not exists
-        sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$db_user'" | grep -q 1 || {
+        if sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$db_user'" | grep -q 1; then
+            log_info "User $db_user exists, updating password..."
+        else
             sudo -u postgres psql -c "CREATE USER $db_user WITH PASSWORD '$db_password';"
             log_info "Created user: $db_user"
-        }
+        fi
+
+        # Always update password (in case it changed)
+        sudo -u postgres psql -c "ALTER USER $db_user WITH PASSWORD '$db_password';" >/dev/null 2>&1
+        log_info "Password updated for: $db_user"
 
         # Create database if not exists
         sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='$db_name'" | grep -q 1 || {
