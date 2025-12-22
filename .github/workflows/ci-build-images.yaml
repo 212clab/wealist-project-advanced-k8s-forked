@@ -4,7 +4,7 @@ name: Build and Push Images to GHCR
 on:
   push:
     branches:
-      - service-deploy-dev
+      - main
     paths:
       - 'services/**'
   workflow_dispatch:
@@ -90,6 +90,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+      security-events: write # [추가됨] Trivy 결과를 Security 탭에 올리기 위해 필요
     
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +148,60 @@ jobs:
             org.opencontainers.image.description=Wealist ${{ matrix.service }} service
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      # -------------------------------------------------------------------------
+      # [1단계] 보안 검사용 임시 빌드 (amd64 Only, No Push)
+      # -------------------------------------------------------------------------
+      - name: Build for Scan (amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.build-config.outputs.context }}
+          file: ${{ steps.build-config.outputs.dockerfile }}
+          platforms: linux/amd64   
+          load: true               # 로컬 도커 데몬으로 이미지 로드
+          push: false              # GHCR에 푸시하지 않음
+          tags: ${{ matrix.service }}:scan-temp
+          # 캐시를 저장하여 2단계(실제 빌드) 속도 향상
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      # -------------------------------------------------------------------------
+      # [2단계] Trivy 스캔 (검사만 수행, 배포 중단 안함)
+      # -------------------------------------------------------------------------
       
+      # A. 로그 확인용 (Table 출력)
+      - name: Run Trivy (Log Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.service }}:scan-temp
+          format: 'table'
+          # [NOTE] 나중에 취약점 발견 시 배포를 막으려면 아래 값을 '1'로 변경하세요.
+          exit-code: '0' 
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      # B. Security 탭 업로드용 (SARIF 생성)
+      - name: Run Trivy (SARIF Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.service }}:scan-temp
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: ${{ matrix.service }}
+
+      # -------------------------------------------------------------------------
+      # [3단계] 실제 배포용 멀티 아키텍처 빌드 및 푸시
+      # -------------------------------------------------------------------------
       - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v5
         with:
@@ -157,18 +211,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 1단계의 캐시를 재사용
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
       
       - name: Output image info
         run: |
-          echo "### 🚀 Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Image Published (Scan Completed)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ needs.detect-changes.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Dockerfile:** ${{ steps.build-config.outputs.dockerfile }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Context:** ${{ steps.build-config.outputs.context }}" >> $GITHUB_STEP_SUMMARY
           echo "**SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Platforms:** linux/amd64,linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -179,11 +232,14 @@ jobs:
 
   update-gitops-manifests:
     needs: [detect-changes, build-and-push]
-    if: |
-      needs.detect-changes.outputs.services != '[]' && 
-      needs.detect-changes.outputs.services != '' &&
-      success() &&
-      github.event.inputs.skip_gitops != 'true'
+    # [중요] 실제 배포를 막기 위해 항상 false가 되도록 설정함 (나중에 배포하려면 이 줄을 삭제하세요)
+    if: false 
+    # 원래 조건 백업:
+    # if: |
+    #   needs.detect-changes.outputs.services != '[]' && 
+    #   needs.detect-changes.outputs.services != '' &&
+    #   success() &&
+    #   github.event.inputs.skip_gitops != 'true'
     runs-on: ubuntu-latest
     environment: service-deploy-dev
     
