@@ -117,7 +117,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -n "${{ github.event.inputs.services }}" ]; then
-              SERVICES=$(echo '${{ github.event.inputs.services }}' | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";""))')
+              SERVICES=$(echo '${{ github.event.inputs.services }}' | jq -cR 'split(",") | map(gsub("^\\s+|\\s+$";""))')
               echo "Manual trigger with services: ${SERVICES}"
             else
               SERVICES='["auth-service","board-service","chat-service","noti-service","storage-service","user-service","video-service"]'
@@ -131,7 +131,7 @@ jobs:
             OTHER_CHANGES='${{ steps.filter.outputs.changes }}'
             if [ "${OTHER_CHANGES}" != "[]" ] && [ -n "${OTHER_CHANGES}" ]; then
               # common-package 제외하고 병합
-              SERVICES=$(echo "${GO_SERVICES}" "${OTHER_CHANGES}" | jq -s 'add | unique | map(select(. != "common-package"))')
+              SERVICES=$(echo "${GO_SERVICES}" "${OTHER_CHANGES}" | jq -sc 'add | unique | map(select(. != "common-package"))')
             else
               SERVICES="${GO_SERVICES}"
             fi
