@@ -222,7 +222,8 @@ jobs:
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA=${SHORT_SHA:0:7}
           ENV="${{ needs.detect-changes.outputs.environment }}"
-          ECR_REGISTRY="${{ needs.detect-changes.outputs.ecr_registry }}"
+          # ECR registry를 직접 구성 (outputs으로 전달 시 secret 마스킹 문제 회피)
+          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
           SERVICE="${{ matrix.service }}"
 
           # 태그 생성
@@ -262,7 +263,7 @@ jobs:
           echo "**Service:** ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ needs.detect-changes.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
-          echo "**ECR Registry:** ${{ needs.detect-changes.outputs.ecr_registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "**ECR Registry:** ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com" >> $GITHUB_STEP_SUMMARY
           echo "**SHA Tag:** ${{ steps.tags.outputs.tag_sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
 
@@ -292,7 +293,8 @@ jobs:
           ENV="${{ needs.detect-changes.outputs.environment }}"
           NEW_TAG="${ENV}-${SHORT_SHA}"
           K8S_BRANCH="${{ needs.detect-changes.outputs.k8s_branch }}"
-          ECR_REGISTRY="${{ needs.detect-changes.outputs.ecr_registry }}"
+          # ECR registry를 직접 구성 (outputs으로 전달 시 secret 마스킹 문제 회피)
+          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
