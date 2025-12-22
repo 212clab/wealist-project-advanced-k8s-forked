@@ -261,6 +261,8 @@ prometheus:
   image:
     repository: ghcr.io/orangescloud/base/prometheus-v2.48.0  # ECR: public.ecr.aws/prometheus/prometheus:v2.48.0
     tag: "latest"
+  config:
+    externalUrl: "https://api.dev.wealist.co.kr/monitoring/prometheus"
 
 # Loki - 로그 수집
 loki:
