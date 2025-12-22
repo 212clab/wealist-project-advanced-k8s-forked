@@ -15,7 +15,11 @@ global:
   # imageRegistry는 ArgoCD Application parameters에서 ECR URL로 덮어씁니다
   # 예: <AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com
   imageRegistry: ""
-  # ECR은 IAM 기반 인증 사용 (EKS IRSA)
+  # EKS에서는 IRSA 사용
+
+# ECR imagePullSecrets (Kind에서는 docker-registry secret 필요)
+imagePullSecrets:
+  - name: ecr-registry-secret
 
 # -----------------------------------------------------------------------------
 # cert-manager Configuration (Disabled - CloudFront handles SSL termination)
