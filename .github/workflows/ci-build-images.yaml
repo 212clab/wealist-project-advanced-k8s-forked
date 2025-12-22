@@ -321,10 +321,10 @@ jobs:
                 s|value: ".*"|value: "'"${NEW_TAG}"'"|
               }' "$MANIFEST_FILE"
 
-              # image.repository 업데이트 (ECR URL로)
-              sed -i.bak '/- name: image\.repository/{
+              # global.imageRegistry 업데이트 (ECR 레지스트리)
+              sed -i.bak '/- name: global\.imageRegistry/{
                 n
-                s|value: ".*"|value: "'"${ECR_REGISTRY}/${service}"'"|
+                s|value: ".*"|value: "'"${ECR_REGISTRY}"'"|
               }' "$MANIFEST_FILE"
 
               rm -f "${MANIFEST_FILE}.bak"
