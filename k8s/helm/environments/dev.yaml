@@ -18,6 +18,11 @@ global:
   #   또는 ArgoCD Application parameters에서 덮어쓰기
   imageRegistry: ghcr.io/orangescloud # ECR: <AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com
 
+# GHCR 이미지 Pull을 위한 시크릿 (kind-dev-setup에서 생성)
+# TODO: ECR 전환 시 ecr-secret으로 변경
+imagePullSecrets:
+  - name: ghcr-secret
+
 # -----------------------------------------------------------------------------
 # cert-manager Configuration (Disabled - CloudFront handles SSL termination)
 # -----------------------------------------------------------------------------
