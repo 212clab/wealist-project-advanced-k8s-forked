@@ -18,7 +18,7 @@ spec:
         - ../../environments/dev.yaml
       parameters:
         - name: image.tag
-          value: "service-deploy-dev-79620c2"  # ← CI가 여기 업데이트
+          value: "dev-fcf0ba0"  # ← CI가 여기 업데이트
         - name: image.repository
           value: "ghcr.io/orangescloud/board-service"
   destination:
