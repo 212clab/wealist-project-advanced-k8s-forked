@@ -636,6 +636,9 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → 서비스 이미�
 	if kubectl run pg-test --rm -i --restart=Never --image=postgres:15-alpine -- \
 		pg_isready -h $$DB_HOST -p 5432 -t 5 2>/dev/null; then \
 		echo "  ✅ PostgreSQL 연결 성공!"; \
+		echo ""; \
+		echo "🔧 PostgreSQL 데이터베이스 초기화 중..."; \
+		sudo ./scripts/init-local-postgres.sh; \
 	else \
 		echo "  ❌ PostgreSQL 연결 실패"; \
 		echo ""; \
@@ -683,22 +686,48 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → 서비스 이미�
 			fi; \
 			echo ""; \
 			echo "🔄 PostgreSQL 재시작 중..."; \
-			sudo systemctl restart postgresql 2>/dev/null || sudo service postgresql restart 2>/dev/null; \
+			IS_WSL=false; \
+			if grep -qi microsoft /proc/version 2>/dev/null; then \
+				IS_WSL=true; \
+				echo "  🖥️  WSL 환경 감지 (systemd 대신 직접 실행)"; \
+			fi; \
+			if [ "$$IS_WSL" = "true" ]; then \
+				PG_DATA_DIR=$$(dirname "$$PG_CONF"); \
+				PG_VERSION=$$(ls /usr/lib/postgresql/ 2>/dev/null | sort -rn | head -1); \
+				echo "  📂 PostgreSQL Data: $$PG_DATA_DIR"; \
+				echo "  📦 PostgreSQL Version: $$PG_VERSION"; \
+				sudo -u postgres /usr/lib/postgresql/$$PG_VERSION/bin/pg_ctl restart -D "$$PG_DATA_DIR" -l /var/log/postgresql/postgresql.log 2>/dev/null || \
+				sudo pg_ctlcluster $$PG_VERSION main restart 2>/dev/null || \
+				{ sudo -u postgres /usr/lib/postgresql/$$PG_VERSION/bin/pg_ctl stop -D "$$PG_DATA_DIR" -m fast 2>/dev/null; \
+				  sleep 2; \
+				  sudo -u postgres /usr/lib/postgresql/$$PG_VERSION/bin/pg_ctl start -D "$$PG_DATA_DIR" -l /var/log/postgresql/postgresql.log; }; \
+				echo "  ✅ PostgreSQL 재시작 완료 (WSL)"; \
+			else \
+				sudo systemctl restart postgresql 2>/dev/null || sudo service postgresql restart 2>/dev/null; \
+				echo "  ✅ PostgreSQL 재시작 완료"; \
+			fi; \
 			sleep 3; \
-			echo "  ✅ PostgreSQL 재시작 완료"; \
 			echo ""; \
 			echo "🔗 연결 재테스트..."; \
 			. /tmp/kind_db_host.env; \
 			if kubectl run pg-test2 --rm -i --restart=Never --image=postgres:15-alpine -- \
 				pg_isready -h $$DB_HOST -p 5432 -t 5 2>/dev/null; then \
 				echo "  ✅ PostgreSQL 연결 성공!"; \
+				echo ""; \
+				echo "🔧 PostgreSQL 데이터베이스 초기화 중..."; \
+				sudo ./scripts/init-local-postgres.sh; \
 			else \
 				echo "  ❌ 여전히 연결 실패"; \
 				echo ""; \
 				echo "  수동 확인 필요:"; \
 				echo "    1. postgresql.conf: listen_addresses = '*'"; \
 				echo "    2. pg_hba.conf: host all all $$DB_SUBNET md5"; \
-				echo "    3. sudo systemctl restart postgresql"; \
+				if [ "$$IS_WSL" = "true" ]; then \
+					echo "    3. sudo pg_ctlcluster <version> main restart"; \
+					echo "       또는: sudo -u postgres /usr/lib/postgresql/<version>/bin/pg_ctl restart -D <data_dir>"; \
+				else \
+					echo "    3. sudo systemctl restart postgresql"; \
+				fi; \
 				echo ""; \
 				echo "계속 진행하시겠습니까? (DB 연결 없이) [y/N]"; \
 				read -r skip; \
