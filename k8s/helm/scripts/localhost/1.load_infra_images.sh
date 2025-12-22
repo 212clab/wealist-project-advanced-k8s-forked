@@ -49,7 +49,7 @@ load() {
     docker push "${LOCAL_REG}/${name}:${tag}"
 }
 
-# GHCR 우선, fallback 지원
+# 공개 레지스트리 우선, GHCR fallback (인증 필요 시)
 load_with_fallback() {
     local ghcr_image=$1 fallback=$2 name=$3 tag=$4
 
@@ -60,7 +60,16 @@ load_with_fallback() {
 
     echo "📦 ${name}:${tag}"
 
-    # GHCR 시도
+    # 공개 레지스트리 먼저 시도 (Docker Hub rate limit 없는 경우 더 빠름)
+    if docker pull --platform linux/amd64 "$fallback" 2>/dev/null; then
+        echo "   ✅ 공개 레지스트리: $fallback"
+        docker tag "$fallback" "${LOCAL_REG}/${name}:${tag}"
+        docker push "${LOCAL_REG}/${name}:${tag}"
+        return
+    fi
+
+    # GHCR fallback (인증된 경우)
+    echo "   ⚠️  공개 레지스트리 실패, GHCR 시도: $ghcr_image"
     if docker pull --platform linux/amd64 "$ghcr_image" 2>/dev/null; then
         echo "   ✅ GHCR: $ghcr_image"
         docker tag "$ghcr_image" "${LOCAL_REG}/${name}:${tag}"
@@ -68,11 +77,8 @@ load_with_fallback() {
         return
     fi
 
-    # Fallback
-    echo "   ⚠️  GHCR 실패, fallback: $fallback"
-    docker pull --platform linux/amd64 "$fallback"
-    docker tag "$fallback" "${LOCAL_REG}/${name}:${tag}"
-    docker push "${LOCAL_REG}/${name}:${tag}"
+    echo "   ❌ 이미지 로드 실패: ${name}:${tag}"
+    return 1
 }
 
 # 데이터베이스 이미지 (GHCR 미러 우선)
