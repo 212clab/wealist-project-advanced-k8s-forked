@@ -120,19 +120,29 @@ kubectl wait --namespace istio-system \
 # 6. Istio Gateway Service를 NodePort로 노출 (Kind hostPort 80/443 사용)
 echo "⚙️ Istio Gateway NodePort 설정 중..."
 # HTTP (port 80) → NodePort 30080 → hostPort 80
-# HTTPS (port 443) → NodePort 30443 → hostPort 443
+# 서비스 포트 구조: ports[0]=15021(status), ports[1]=80(http)
+
+# 서비스가 생성될 때까지 대기
+echo "⏳ Istio Gateway 서비스 대기 중..."
+kubectl wait --namespace istio-system \
+  --for=jsonpath='{.spec.type}'=LoadBalancer \
+  svc/istio-ingressgateway-istio \
+  --timeout=60s 2>/dev/null || true
+
+# NodePort로 변경하고 포트 80의 nodePort를 30080으로 설정
+# replace를 사용하여 기존 nodePort 값을 덮어씀
 kubectl patch service istio-ingressgateway-istio -n istio-system --type='json' -p='[
-  {
-    "op": "replace",
-    "path": "/spec/type",
-    "value": "NodePort"
-  },
-  {
-    "op": "add",
-    "path": "/spec/ports/1/nodePort",
-    "value": 30080
-  }
-]' || echo "INFO: Service 이미 NodePort로 설정됨"
+  {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+  {"op": "replace", "path": "/spec/ports/1/nodePort", "value": 30080}
+]' 2>/dev/null || \
+kubectl patch service istio-ingressgateway-istio -n istio-system --type='json' -p='[
+  {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+  {"op": "add", "path": "/spec/ports/1/nodePort", "value": 30080}
+]' 2>/dev/null || echo "⚠️ NodePort 패치 실패 - 수동 설정 필요"
+
+# 설정 확인
+echo "📋 Gateway 서비스 상태:"
+kubectl get svc -n istio-system istio-ingressgateway-istio -o wide
 
 echo "✅ Istio Gateway 설정 완료"
 echo "   - HTTP:  localhost:80 (또는 :8080)"
