@@ -214,7 +214,7 @@ istio:
       enabled: false
       host: minio
       port: 9000
-    # Monitoring routes (Grafana, Prometheus, Loki)
+    # Monitoring routes (Grafana, Prometheus, Loki, Kiali, Jaeger)
     monitoring:
       enabled: true
       grafana:
@@ -229,6 +229,19 @@ istio:
         prefix: /monitoring/loki
         host: loki
         port: 3100
+      # Istio Observability (istio-system 네임스페이스)
+      kiali:
+        enabled: true
+        prefix: /monitoring/kiali
+        host: kiali
+        namespace: istio-system
+        port: 20001
+      jaeger:
+        enabled: true
+        prefix: /monitoring/jaeger
+        host: tracing
+        namespace: istio-system
+        port: 80
 
   # mTLS - 서비스 간 암호화
   mtls:
@@ -310,7 +323,8 @@ prometheus:
     repository: localhost:5001/prometheus
     tag: "v2.48.0"
   config:
-    externalUrl: "http://localhost:8080/monitoring/prometheus"
+    externalUrl: "http://localhost:8080/api/monitoring/prometheus"
+    routePrefix: "/monitoring/prometheus"
 
 # Loki - 로그 수집
 loki:
@@ -337,7 +351,7 @@ grafana:
     port: 3000
   config:
     allowSignUp: false
-    rootUrl: "http://localhost:8080/monitoring/grafana"
+    rootUrl: "http://localhost:8080/api/monitoring/grafana"
     serveFromSubPath: "true"
 
 # 모니터링 Ingress (nginx - 비활성화)
