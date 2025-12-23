@@ -215,18 +215,16 @@ istio:
       host: minio
       port: 9000
     # Monitoring routes (Grafana, Prometheus, Loki)
+    # HTTPRoute에서 /api/monitoring/* 경로를 그대로 전달 (rewrite 없음)
     monitoring:
       enabled: true
       grafana:
-        prefix: /monitoring/grafana
         host: grafana
         port: 3000
       prometheus:
-        prefix: /monitoring/prometheus
         host: prometheus
         port: 9090
       loki:
-        prefix: /monitoring/loki
         host: loki
         port: 3100
       # Kiali/Jaeger: localhost에서는 비활성화 (볼 트래픽 없음)

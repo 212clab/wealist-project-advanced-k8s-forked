@@ -153,31 +153,26 @@ istio:
       enabled: true
       host: minio
       port: 9000
-    # Monitoring routes (활성화 - localhost:8080/monitoring/*)
+    # Monitoring routes (/api/monitoring/* → 각 서비스로 직접 전달, rewrite 없음)
     monitoring:
       enabled: true
       grafana:
-        prefix: /monitoring/grafana
         host: grafana
         port: 3000
       prometheus:
-        prefix: /monitoring/prometheus
         host: prometheus
         port: 9090
       loki:
-        prefix: /monitoring/loki
         host: loki
         port: 3100
       # Istio 관측성 도구 (istio-system 네임스페이스)
       kiali:
         enabled: true
-        prefix: /monitoring/kiali
         host: kiali
         namespace: istio-system
         port: 20001
       jaeger:
         enabled: true
-        prefix: /monitoring/jaeger
         host: tracing
         namespace: istio-system
         port: 80
