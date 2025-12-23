@@ -229,11 +229,11 @@ istio:
       minHealthPercent: 30
 
   # 서비스 간 통신 제어
-  # dev: Zero Trust 정책 적용
+  # dev: Zero Trust 정책 적용 (외부 트래픽만 제한)
   authorizationPolicy:
     enabled: true
     denyAll: true  # dev: 기본 거부 (Zero Trust)
-    allowSameNamespace: false  # dev: 같은 네임스페이스 내 자동 허용 비활성화
+    allowSameNamespace: true  # dev: 같은 네임스페이스 내 서비스 간 통신 허용
 
   # 서비스별 호출 권한 (L7 정책)
   serviceAuthorization:
