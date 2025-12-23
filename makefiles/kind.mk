@@ -534,30 +534,74 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → ECR 이미지 사
 	@echo "dev 환경은 AWS ECR에서 이미지를 pull합니다."
 	@echo "AWS 로그인이 필요합니다."
 	@echo ""
-	@# AWS 로그인 확인
+	@# AWS CLI 확인 및 설치
 	@if ! command -v aws >/dev/null 2>&1; then \
 		echo "❌ AWS CLI: 미설치"; \
 		echo ""; \
-		echo "AWS CLI를 설치하세요:"; \
-		echo "  macOS: brew install awscli"; \
-		echo "  Linux: curl 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip' && unzip awscliv2.zip && sudo ./aws/install"; \
-		exit 1; \
-	fi; \
-	echo "✅ AWS CLI: 설치됨"; \
-	echo ""; \
-	if ! aws sts get-caller-identity >/dev/null 2>&1; then \
+		echo "AWS CLI를 자동 설치하시겠습니까? [Y/n]"; \
+		read -r answer; \
+		if [ "$$answer" != "n" ] && [ "$$answer" != "N" ]; then \
+			echo ""; \
+			echo "AWS CLI 설치 중..."; \
+			if [ "$$(uname)" = "Darwin" ]; then \
+				brew install awscli; \
+			else \
+				curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"; \
+				cd /tmp && unzip -q -o awscliv2.zip && sudo ./aws/install --update; \
+				rm -rf /tmp/aws /tmp/awscliv2.zip; \
+			fi; \
+			echo ""; \
+			echo "✅ AWS CLI 설치 완료!"; \
+		else \
+			echo ""; \
+			echo "AWS CLI 없이는 진행할 수 없습니다."; \
+			exit 1; \
+		fi; \
+	else \
+		echo "✅ AWS CLI: $$(aws --version 2>/dev/null | cut -d' ' -f1)"; \
+	fi
+	@echo ""
+	@# AWS 로그인 확인
+	@if ! aws sts get-caller-identity >/dev/null 2>&1; then \
 		echo "❌ AWS: 로그인 필요"; \
 		echo ""; \
-		echo "AWS 로그인이 필요합니다. 다음 중 하나를 실행하세요:"; \
-		echo ""; \
-		echo "  1. SSO 로그인:"; \
-		echo "     aws configure sso"; \
-		echo "     aws sso login --profile <your-profile>"; \
-		echo ""; \
-		echo "  2. Access Key 설정:"; \
-		echo "     aws configure"; \
-		echo ""; \
-		exit 1; \
+		echo "AWS 자격증명을 설정하시겠습니까? [Y/n]"; \
+		read -r answer; \
+		if [ "$$answer" != "n" ] && [ "$$answer" != "N" ]; then \
+			echo ""; \
+			echo "AWS 자격증명 설정 방법을 선택하세요:"; \
+			echo "  1. Access Key 설정 (aws configure)"; \
+			echo "  2. SSO 로그인 (aws sso login)"; \
+			echo ""; \
+			printf "선택 [1/2]: "; \
+			read -r choice; \
+			if [ "$$choice" = "2" ]; then \
+				echo ""; \
+				echo "SSO 프로필이 설정되어 있지 않다면 먼저 'aws configure sso'를 실행하세요."; \
+				printf "SSO 프로필명 (기본: default): "; \
+				read -r profile; \
+				profile=$${profile:-default}; \
+				aws sso login --profile $$profile; \
+				export AWS_PROFILE=$$profile; \
+			else \
+				echo ""; \
+				echo "AWS Access Key를 입력하세요."; \
+				echo "(IAM → 사용자 → 보안 자격 증명 → 액세스 키에서 생성)"; \
+				echo ""; \
+				aws configure; \
+			fi; \
+			echo ""; \
+			if aws sts get-caller-identity >/dev/null 2>&1; then \
+				echo "✅ AWS 로그인 성공!"; \
+			else \
+				echo "❌ AWS 로그인 실패. 자격증명을 확인하세요."; \
+				exit 1; \
+			fi; \
+		else \
+			echo ""; \
+			echo "AWS 로그인 없이는 진행할 수 없습니다."; \
+			exit 1; \
+		fi; \
 	fi; \
 	AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --query Account --output text); \
 	AWS_REGION=$${AWS_REGION:-ap-northeast-2}; \
