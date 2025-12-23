@@ -2,26 +2,26 @@
 # =============================================================================
 # Kind 클러스터 + Istio Ambient 설정 (dev 환경)
 # =============================================================================
-# - 로컬 레지스트리: localhost:5001
+# - 레지스트리: GHCR (ghcr.io/orangescloud)
 # - Istio Ambient: Service Mesh (sidecar-less)
 # - Gateway API: Kubernetes 표준 (NodePort 30080 → hostPort 8080)
+# - ArgoCD: GitOps 배포
 
 set -e
 
 CLUSTER_NAME="wealist"
-REG_NAME="kind-registry"
-REG_PORT="5001"
 ISTIO_VERSION="1.24.0"
 GATEWAY_API_VERSION="v1.2.0"
 
 # 스크립트 디렉토리 및 kind-config.yaml 경로
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HELM_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-KIND_CONFIG="${HELM_DIR}/kind-config.yaml"
+KIND_CONFIG="${SCRIPT_DIR}/kind-config.yaml"  # 환경별 분리된 설정 사용
 
-echo "🚀 Kind 클러스터 + Istio Ambient 설정 (dev)"
+echo "🚀 Kind 클러스터 + Istio Ambient 설정 (dev - GHCR)"
 echo "   - Istio: ${ISTIO_VERSION}"
 echo "   - Gateway API: ${GATEWAY_API_VERSION}"
+echo "   - Registry: ghcr.io/orangescloud (GHCR)"
 echo "   - Kind Config: ${KIND_CONFIG}"
 echo ""
 
@@ -37,41 +37,16 @@ if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     kind delete cluster --name "$CLUSTER_NAME"
 fi
 
-# 2. 로컬 레지스트리 시작 (없으면)
-if [ "$(docker inspect -f '{{.State.Running}}' "${REG_NAME}" 2>/dev/null || true)" != 'true' ]; then
-    echo "📦 로컬 레지스트리 시작 (localhost:${REG_PORT})"
-    docker run -d --restart=always -p "127.0.0.1:${REG_PORT}:5000" --network bridge --name "${REG_NAME}" registry:2
-fi
-
-# 3. Kind 클러스터 생성
+# 2. Kind 클러스터 생성
 echo "🚀 Kind 클러스터 생성 중..."
 kind create cluster --name "$CLUSTER_NAME" --config "${KIND_CONFIG}"
 
-# 4. 레지스트리를 Kind 네트워크에 연결
-if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${REG_NAME}" 2>/dev/null)" = 'null' ]; then
-    echo "레지스트리를 Kind 네트워크에 연결..."
-    docker network connect "kind" "${REG_NAME}"
-fi
-
-# 5. 레지스트리 ConfigMap 생성
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: local-registry-hosting
-  namespace: kube-public
-data:
-  localRegistryHosting.v1: |
-    host: "localhost:${REG_PORT}"
-    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
-EOF
-
-# 6. Gateway API CRDs 설치
+# 3. Gateway API CRDs 설치
 echo "⏳ Gateway API CRDs 설치 중..."
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml
 echo "✅ Gateway API CRDs 설치 완료"
 
-# 7. Istio Ambient 모드 설치
+# 4. Istio Ambient 모드 설치
 echo "⏳ Istio Ambient 모드 설치 중..."
 
 # istioctl 설치 확인 및 경로 설정
@@ -108,7 +83,15 @@ kubectl wait --namespace istio-system \
 
 echo "✅ Istio Ambient 설치 완료"
 
-# 8. Istio Ingress Gateway 설치 (외부 트래픽용)
+# 4-1. Istio 관측성 애드온 설치 (Kiali, Jaeger)
+echo "⏳ Istio 관측성 애드온 설치 중 (Kiali, Jaeger)..."
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/addons/kiali.yaml 2>/dev/null || \
+    kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/kiali.yaml
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/addons/jaeger.yaml 2>/dev/null || \
+    kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/jaeger.yaml
+echo "✅ Kiali, Jaeger 설치 완료"
+
+# 5. Istio Ingress Gateway 설치 (외부 트래픽용)
 echo "⏳ Istio Ingress Gateway 설치 중..."
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -134,23 +117,38 @@ kubectl wait --namespace istio-system \
   --selector=gateway.networking.k8s.io/gateway-name=istio-ingressgateway \
   --timeout=120s || echo "WARNING: Istio gateway not ready yet"
 
-# 9. Istio Gateway Service를 NodePort로 노출 (Kind hostPort 8080 사용)
-# ports[0]=status-port(15021), ports[1]=http(80) → http에 NodePort 30080 할당
+# 6. Istio Gateway Service를 NodePort로 노출 (Kind hostPort 80/443 사용)
 echo "⚙️ Istio Gateway NodePort 설정 중..."
-kubectl patch service istio-ingressgateway-istio -n istio-system --type='json' -p='[
-  {
-    "op": "replace",
-    "path": "/spec/type",
-    "value": "NodePort"
-  },
-  {
-    "op": "add",
-    "path": "/spec/ports/1/nodePort",
-    "value": 30080
-  }
-]' || echo "INFO: Service 이미 NodePort로 설정됨"
+# HTTP (port 80) → NodePort 30080 → hostPort 80
+# 서비스 포트 구조: ports[0]=15021(status), ports[1]=80(http)
 
-# 10. 애플리케이션 네임스페이스 생성 (Ambient 모드 라벨 포함)
+# 서비스가 생성될 때까지 대기
+echo "⏳ Istio Gateway 서비스 대기 중..."
+kubectl wait --namespace istio-system \
+  --for=jsonpath='{.spec.type}'=LoadBalancer \
+  svc/istio-ingressgateway-istio \
+  --timeout=60s 2>/dev/null || true
+
+# NodePort로 변경하고 포트 80의 nodePort를 30080으로 설정
+# replace를 사용하여 기존 nodePort 값을 덮어씀
+kubectl patch service istio-ingressgateway-istio -n istio-system --type='json' -p='[
+  {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+  {"op": "replace", "path": "/spec/ports/1/nodePort", "value": 30080}
+]' 2>/dev/null || \
+kubectl patch service istio-ingressgateway-istio -n istio-system --type='json' -p='[
+  {"op": "replace", "path": "/spec/type", "value": "NodePort"},
+  {"op": "add", "path": "/spec/ports/1/nodePort", "value": 30080}
+]' 2>/dev/null || echo "⚠️ NodePort 패치 실패 - 수동 설정 필요"
+
+# 설정 확인
+echo "📋 Gateway 서비스 상태:"
+kubectl get svc -n istio-system istio-ingressgateway-istio -o wide
+
+echo "✅ Istio Gateway 설정 완료"
+echo "   - HTTP:  localhost:80 (또는 :8080)"
+echo "   - HTTPS: localhost:443"
+
+# 7. 애플리케이션 네임스페이스 생성 (Ambient 모드 라벨 포함)
 echo "📦 wealist-dev 네임스페이스 생성 (Ambient 모드)..."
 kubectl create namespace wealist-dev 2>/dev/null || true
 kubectl label namespace wealist-dev istio.io/dataplane-mode=ambient --overwrite
@@ -174,22 +172,59 @@ kubectl annotate namespace wealist-dev \
 
 echo "✅ 네임스페이스에 Ambient 모드 + Git 정보 라벨 적용 완료"
 
+# 8. GHCR 인증 Secret 생성
+echo "🔐 GHCR 인증 Secret 설정 중..."
+if [ -n "${GHCR_TOKEN}" ] && [ -n "${GHCR_USERNAME}" ]; then
+    kubectl create secret docker-registry ghcr-secret \
+        --docker-server=ghcr.io \
+        --docker-username="${GHCR_USERNAME}" \
+        --docker-password="${GHCR_TOKEN}" \
+        -n wealist-dev 2>/dev/null || \
+    kubectl delete secret ghcr-secret -n wealist-dev 2>/dev/null && \
+    kubectl create secret docker-registry ghcr-secret \
+        --docker-server=ghcr.io \
+        --docker-username="${GHCR_USERNAME}" \
+        --docker-password="${GHCR_TOKEN}" \
+        -n wealist-dev
+    echo "✅ GHCR Secret 생성 완료"
+else
+    echo "⚠️  GHCR_TOKEN 또는 GHCR_USERNAME 환경변수가 없습니다."
+    echo "   나중에 다음 명령어로 생성하세요:"
+    echo "   kubectl create secret docker-registry ghcr-secret \\"
+    echo "     --docker-server=ghcr.io \\"
+    echo "     --docker-username=<github-username> \\"
+    echo "     --docker-password=<github-token> \\"
+    echo "     -n wealist-dev"
+fi
+
 echo ""
 echo "=============================================="
 echo "  ✅ dev 클러스터 준비 완료!"
 echo "=============================================="
 echo ""
-echo "📦 로컬 레지스트리: localhost:${REG_PORT}"
-echo "🌐 Istio Gateway: localhost:8080 (NodePort 30080)"
+echo "🔐 Registry: ghcr.io/orangescloud (GHCR)"
+echo "🌐 Istio Gateway: localhost:80 (또는 :8080)"
+echo ""
+echo "📊 모니터링 (helm-install-all 후 접근 가능):"
+echo "   - Grafana:    http://dev.wealist.co.kr/monitoring/grafana"
+echo "   - Prometheus: http://dev.wealist.co.kr/monitoring/prometheus"
+echo "   - Kiali:      http://dev.wealist.co.kr/monitoring/kiali"
+echo "   - Jaeger:     http://dev.wealist.co.kr/monitoring/jaeger"
+echo "   ※ hosts 파일에 127.0.0.1 dev.wealist.co.kr 추가 필요"
 echo ""
 echo "📝 다음 단계:"
-echo "   1. 이미지 로드:"
-echo "      ./1.load_infra_images.sh"
-echo "      ./2.build_all_and_load.sh"
+echo "   1. GHCR 로그인 (이미지 푸시/풀 위해):"
+echo "      echo \$GHCR_TOKEN | docker login ghcr.io -u \$GHCR_USERNAME --password-stdin"
 echo ""
-echo "   2. Helm 배포:"
+echo "   2. 이미지 빌드 및 GHCR 푸시:"
+echo "      ./2.build_and_push_ghcr.sh"
+echo ""
+echo "   3. ArgoCD 배포 (선택사항):"
+echo "      make bootstrap && make deploy"
+echo ""
+echo "   4. 또는 Helm 직접 배포:"
 echo "      make helm-install-all ENV=dev"
 echo ""
-echo "   3. 접근 (API only, frontend는 CloudFront):"
-echo "      http://localhost:8080/svc/auth/api/..."
+echo "   5. 접근:"
+echo "      http://localhost:8080/"
 echo "=============================================="

@@ -1,6 +1,21 @@
 # syntax=docker/dockerfile:1.4
+# =============================================================================
+# Base Image 설정 (환경별 선택 가능)
+# =============================================================================
+# localhost: 기본값 (공개 이미지)
+# dev/prod:  --build-arg로 ECR 이미지 지정
+#   docker build --build-arg GRADLE_IMAGE=<ecr>/gradle:8-jdk21 \
+#                --build-arg JRE_IMAGE=<ecr>/eclipse-temurin:21-jre-jammy ...
+# =============================================================================
+ARG GRADLE_IMAGE=gradle:8-jdk21
+ARG JRE_IMAGE=eclipse-temurin:21-jre-jammy
+
 # Build stage
-FROM gradle:8-jdk21 AS builder
+<<<<<<< Updated upstream
+FROM ${GRADLE_IMAGE} AS builder
+=======
+FROM public.ecr.aws/docker/library/gradle:8-jdk21 AS builder
+>>>>>>> Stashed changes
 WORKDIR /home/gradle/src
 
 # Use Gradle Wrapper for consistent builds
@@ -18,7 +33,11 @@ RUN --mount=type=cache,target=/home/gradle/.gradle \
     ./gradlew bootJar --no-daemon
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-jammy as final
+<<<<<<< Updated upstream
+FROM ${JRE_IMAGE} as final
+=======
+FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre-jammy AS final
+>>>>>>> Stashed changes
 ENV TZ=Asia/Seoul
 
 # Create a non-root user

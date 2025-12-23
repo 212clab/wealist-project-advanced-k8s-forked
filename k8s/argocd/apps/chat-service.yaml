@@ -3,24 +3,36 @@ kind: Application
 metadata:
   name: chat-service
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: wealist
   source:
-    repoURL: https://github.com/OrangesCloud/wealist-argo-helm.git 
-    targetRevision: main
+    repoURL:  https://github.com/OrangesCloud/wealist-project-advanced-k8s.git
+    targetRevision: k8s-deploy-dev
     path: k8s/helm/charts/chat-service
     helm:
       valueFiles:
         - values.yaml
-        - ../../environments/local-kind.yaml
+        - ../../environments/base.yaml
+        - ../../environments/dev.yaml
       parameters:
+<<<<<<< Updated upstream
         - name: image.tag
-          value: "latest"
+          value: "service-deploy-dev-79620c2"  # ← CI가 여기 업데이트
+        - name: image.repository
+          value: "ghcr.io/orangescloud/chat-service"
+=======
         - name: global.imageRegistry
-          value: "localhost:5001"
+          value: "<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com"  # ← CI가 여기 업데이트
+        - name: image.repository
+          value: "chat-service"
+        - name: image.tag
+          value: "dev-latest"  # ← CI가 여기 업데이트
+>>>>>>> Stashed changes
   destination:
     server: https://kubernetes.default.svc
-    namespace: wealist-localhost
+    namespace: wealist-dev 
   syncPolicy:
     automated:
       prune: true

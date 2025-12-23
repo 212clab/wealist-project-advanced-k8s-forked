@@ -17,7 +17,7 @@ GATEWAY_API_VERSION="v1.2.0"
 # 스크립트 디렉토리 및 kind-config.yaml 경로
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HELM_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-KIND_CONFIG="${HELM_DIR}/kind-config.yaml"
+KIND_CONFIG="${SCRIPT_DIR}/kind-config.yaml"  # 환경별 분리된 설정 사용
 
 echo "🚀 Kind 클러스터 + Istio Ambient 설정 (localhost)"
 echo "   - Istio: ${ISTIO_VERSION}"
@@ -108,6 +108,14 @@ kubectl wait --namespace istio-system \
 
 echo "✅ Istio Ambient 설치 완료"
 
+# 7-1. Istio 관측성 애드온 설치 (Kiali, Jaeger)
+echo "⏳ Istio 관측성 애드온 설치 중 (Kiali, Jaeger)..."
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/addons/kiali.yaml 2>/dev/null || \
+    kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/kiali.yaml
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/addons/jaeger.yaml 2>/dev/null || \
+    kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/jaeger.yaml
+echo "✅ Kiali, Jaeger 설치 완료"
+
 # 8. Istio Ingress Gateway 설치 (외부 트래픽용)
 echo "⏳ Istio Ingress Gateway 설치 중..."
 kubectl apply -f - <<EOF
@@ -180,7 +188,13 @@ echo "  ✅ localhost 클러스터 준비 완료!"
 echo "=============================================="
 echo ""
 echo "📦 로컬 레지스트리: localhost:${REG_PORT}"
-echo "🌐 Istio Gateway: localhost:8080 (NodePort 30080)"
+echo "🌐 Istio Gateway: localhost:80 (또는 :8080)"
+echo ""
+echo "📊 모니터링 (helm-install-all 후 접근 가능):"
+echo "   - Grafana:    http://localhost:8080/monitoring/grafana"
+echo "   - Prometheus: http://localhost:8080/monitoring/prometheus"
+echo "   - Kiali:      http://localhost:8080/monitoring/kiali"
+echo "   - Jaeger:     http://localhost:8080/monitoring/jaeger"
 echo ""
 echo "📝 다음 단계:"
 echo "   1. 이미지 로드:"
