@@ -1005,7 +1005,8 @@ endif
 
 kind-setup-simple: ## 클러스터 생성 + nginx ingress (Istio 없음, 단순 테스트용)
 	@echo "=== Kind 클러스터 + nginx ingress (simple 모드) 생성 ==="
-	./k8s/installShell/0.setup-cluster-simple.sh
+	@echo "⚠️  이 타겟은 deprecated 되었습니다."
+	@echo "   대신 'make kind-localhost-setup' 또는 'make kind-dev-setup'을 사용하세요."
 	@echo ""
 	@echo "클러스터 준비 완료! 다음: make kind-load-images"
 
