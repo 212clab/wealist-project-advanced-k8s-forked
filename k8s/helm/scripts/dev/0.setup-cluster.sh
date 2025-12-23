@@ -123,15 +123,11 @@ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samp
 # 4-2. Kiali/Jaeger subpath 설정 (HTTPRoute /monitoring/* 경로용)
 echo "⏳ Kiali/Jaeger subpath 설정 중..."
 
-# Kiali ConfigMap 패치 - web_root 설정
+# Kiali ConfigMap 패치 - web_root를 /monitoring/kiali로 변경
+# 기본 Istio addon은 web_root: /kiali로 설정됨 → /monitoring/kiali로 변경 필요
 kubectl get configmap kiali -n istio-system -o yaml | \
-    sed 's|web_root: ""|web_root: "/monitoring/kiali"|g' | \
-    sed '/server:/a\      web_root: "/monitoring/kiali"' | \
+    sed 's|web_root: /kiali|web_root: /monitoring/kiali|g' | \
     kubectl apply -f - 2>/dev/null || true
-
-# Kiali ConfigMap이 web_root 없으면 직접 패치
-kubectl patch configmap kiali -n istio-system --type=json \
-    -p='[{"op": "replace", "path": "/data/config.yaml", "value": "'"$(kubectl get configmap kiali -n istio-system -o jsonpath='{.data.config\.yaml}' | sed 's/server:/server:\n      web_root: "\/monitoring\/kiali"/')"'"}]' 2>/dev/null || true
 
 # Jaeger 환경변수 설정 (QUERY_BASE_PATH)
 kubectl set env deployment/jaeger -n istio-system QUERY_BASE_PATH=/monitoring/jaeger 2>/dev/null || true

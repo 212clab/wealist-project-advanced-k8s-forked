@@ -1371,13 +1371,15 @@ kind-fix-monitoring-subpath: ## Kiali/Jaeger subpath 설정 (/monitoring/kiali, 
 	@echo "=== Kiali/Jaeger subpath 설정 ==="
 	@echo ""
 	@echo "📝 Kiali ConfigMap 패치 (web_root: /monitoring/kiali)..."
-	@kubectl get configmap kiali -n istio-system -o jsonpath='{.data.config\.yaml}' > /tmp/kiali-config.yaml 2>/dev/null || { echo "❌ Kiali ConfigMap not found"; exit 1; }
-	@if ! grep -q "web_root:" /tmp/kiali-config.yaml; then \
-		sed -i 's/server:/server:\n      web_root: "\/monitoring\/kiali"/' /tmp/kiali-config.yaml; \
-		kubectl create configmap kiali -n istio-system --from-file=config.yaml=/tmp/kiali-config.yaml --dry-run=client -o yaml | kubectl apply -f -; \
-		echo "✅ Kiali web_root 설정 완료"; \
+	@kubectl get configmap kiali -n istio-system -o yaml > /tmp/kiali-cm.yaml 2>/dev/null || { echo "❌ Kiali ConfigMap not found"; exit 1; }
+	@if grep -q "web_root: /monitoring/kiali" /tmp/kiali-cm.yaml; then \
+		echo "ℹ️  Kiali web_root 이미 올바르게 설정됨"; \
 	else \
-		echo "ℹ️  Kiali web_root 이미 설정됨"; \
+		echo "🔧 web_root 값 수정 중..."; \
+		sed -i 's|web_root: /kiali|web_root: /monitoring/kiali|g' /tmp/kiali-cm.yaml; \
+		sed -i 's|web_root: ""|web_root: /monitoring/kiali|g' /tmp/kiali-cm.yaml; \
+		kubectl apply -f /tmp/kiali-cm.yaml; \
+		echo "✅ Kiali web_root 설정 완료"; \
 	fi
 	@echo ""
 	@echo "📝 Jaeger 환경변수 설정 (QUERY_BASE_PATH: /monitoring/jaeger)..."
