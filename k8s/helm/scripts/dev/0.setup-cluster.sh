@@ -2,7 +2,7 @@
 # =============================================================================
 # Kind 클러스터 + Istio Ambient 설정 (dev 환경)
 # =============================================================================
-# - 레지스트리: GHCR (ghcr.io/orangescloud)
+# - 레지스트리: AWS ECR (<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com)
 # - Istio Ambient: Service Mesh (sidecar-less)
 # - Gateway API: Kubernetes 표준 (NodePort 30080 → hostPort 8080)
 # - ArgoCD: GitOps 배포
@@ -12,16 +12,17 @@ set -e
 CLUSTER_NAME="wealist"
 ISTIO_VERSION="1.24.0"
 GATEWAY_API_VERSION="v1.2.0"
+AWS_REGION="ap-northeast-2"
 
 # 스크립트 디렉토리 및 kind-config.yaml 경로
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HELM_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 KIND_CONFIG="${SCRIPT_DIR}/kind-config.yaml"  # 환경별 분리된 설정 사용
 
-echo "🚀 Kind 클러스터 + Istio Ambient 설정 (dev - GHCR)"
+echo "🚀 Kind 클러스터 + Istio Ambient 설정 (dev - AWS ECR)"
 echo "   - Istio: ${ISTIO_VERSION}"
 echo "   - Gateway API: ${GATEWAY_API_VERSION}"
-echo "   - Registry: ghcr.io/orangescloud (GHCR)"
+echo "   - Registry: AWS ECR (ap-northeast-2)"
 echo "   - Kind Config: ${KIND_CONFIG}"
 echo ""
 
@@ -30,6 +31,35 @@ if [ ! -f "${KIND_CONFIG}" ]; then
     echo "❌ kind-config.yaml 파일이 없습니다: ${KIND_CONFIG}"
     exit 1
 fi
+
+# =============================================================================
+# AWS 로그인 확인
+# =============================================================================
+echo "🔐 AWS 로그인 확인 중..."
+if ! aws sts get-caller-identity &>/dev/null; then
+    echo "❌ AWS 로그인이 필요합니다!"
+    echo ""
+    echo "   다음 중 하나로 로그인하세요:"
+    echo ""
+    echo "   1. AWS SSO 로그인:"
+    echo "      aws sso login --profile <your-profile>"
+    echo ""
+    echo "   2. AWS 자격증명 설정:"
+    echo "      aws configure"
+    echo ""
+    echo "   3. 환경변수 설정:"
+    echo "      export AWS_ACCESS_KEY_ID=<your-key>"
+    echo "      export AWS_SECRET_ACCESS_KEY=<your-secret>"
+    echo ""
+    exit 1
+fi
+
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+echo "✅ AWS 로그인 확인 완료"
+echo "   - Account: ${AWS_ACCOUNT_ID}"
+echo "   - ECR: ${ECR_REGISTRY}"
+echo ""
 
 # 1. 기존 클러스터 삭제 (있으면)
 if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
@@ -172,29 +202,30 @@ kubectl annotate namespace wealist-dev \
 
 echo "✅ 네임스페이스에 Ambient 모드 + Git 정보 라벨 적용 완료"
 
-# 8. GHCR 인증 Secret 생성
-echo "🔐 GHCR 인증 Secret 설정 중..."
-if [ -n "${GHCR_TOKEN}" ] && [ -n "${GHCR_USERNAME}" ]; then
-    kubectl create secret docker-registry ghcr-secret \
-        --docker-server=ghcr.io \
-        --docker-username="${GHCR_USERNAME}" \
-        --docker-password="${GHCR_TOKEN}" \
-        -n wealist-dev 2>/dev/null || \
-    kubectl delete secret ghcr-secret -n wealist-dev 2>/dev/null && \
-    kubectl create secret docker-registry ghcr-secret \
-        --docker-server=ghcr.io \
-        --docker-username="${GHCR_USERNAME}" \
-        --docker-password="${GHCR_TOKEN}" \
+# 8. ECR 인증 Secret 생성
+echo "🔐 ECR 인증 Secret 설정 중..."
+ECR_PASSWORD=$(aws ecr get-login-password --region ${AWS_REGION})
+
+if [ -n "${ECR_PASSWORD}" ]; then
+    kubectl delete secret ecr-secret -n wealist-dev 2>/dev/null || true
+    kubectl create secret docker-registry ecr-secret \
+        --docker-server="${ECR_REGISTRY}" \
+        --docker-username=AWS \
+        --docker-password="${ECR_PASSWORD}" \
         -n wealist-dev
-    echo "✅ GHCR Secret 생성 완료"
+    echo "✅ ECR Secret 생성 완료"
 else
-    echo "⚠️  GHCR_TOKEN 또는 GHCR_USERNAME 환경변수가 없습니다."
-    echo "   나중에 다음 명령어로 생성하세요:"
-    echo "   kubectl create secret docker-registry ghcr-secret \\"
-    echo "     --docker-server=ghcr.io \\"
-    echo "     --docker-username=<github-username> \\"
-    echo "     --docker-password=<github-token> \\"
-    echo "     -n wealist-dev"
+    echo "❌ ECR 로그인 실패. AWS 자격증명을 확인하세요."
+    exit 1
+fi
+
+# 9. dev.yaml에 AWS Account ID 업데이트 안내
+DEV_YAML="${HELM_DIR}/environments/dev.yaml"
+if grep -q "<AWS_ACCOUNT_ID>" "${DEV_YAML}" 2>/dev/null; then
+    echo ""
+    echo "⚠️  dev.yaml에 AWS Account ID를 업데이트해주세요:"
+    echo "   sed -i 's/<AWS_ACCOUNT_ID>/${AWS_ACCOUNT_ID}/g' ${DEV_YAML}"
+    echo ""
 fi
 
 echo ""
@@ -202,29 +233,25 @@ echo "=============================================="
 echo "  ✅ dev 클러스터 준비 완료!"
 echo "=============================================="
 echo ""
-echo "🔐 Registry: ghcr.io/orangescloud (GHCR)"
+echo "🔐 Registry: ${ECR_REGISTRY} (AWS ECR)"
 echo "🌐 Istio Gateway: localhost:80 (또는 :8080)"
 echo ""
 echo "📊 모니터링 (helm-install-all 후 접근 가능):"
-echo "   - Grafana:    http://dev.wealist.co.kr/monitoring/grafana"
-echo "   - Prometheus: http://dev.wealist.co.kr/monitoring/prometheus"
-echo "   - Kiali:      http://dev.wealist.co.kr/monitoring/kiali"
-echo "   - Jaeger:     http://dev.wealist.co.kr/monitoring/jaeger"
-echo "   ※ hosts 파일에 127.0.0.1 dev.wealist.co.kr 추가 필요"
+echo "   - Grafana:    https://api.dev.wealist.co.kr/monitoring/grafana"
+echo "   - Prometheus: https://api.dev.wealist.co.kr/monitoring/prometheus"
+echo "   - Kiali:      https://api.dev.wealist.co.kr/monitoring/kiali"
+echo "   - Jaeger:     https://api.dev.wealist.co.kr/monitoring/jaeger"
 echo ""
 echo "📝 다음 단계:"
-echo "   1. GHCR 로그인 (이미지 푸시/풀 위해):"
-echo "      echo \$GHCR_TOKEN | docker login ghcr.io -u \$GHCR_USERNAME --password-stdin"
+echo "   1. dev.yaml에 AWS Account ID 설정 (아직 안했다면):"
+echo "      sed -i 's/<AWS_ACCOUNT_ID>/${AWS_ACCOUNT_ID}/g' ${DEV_YAML}"
 echo ""
-echo "   2. 이미지 빌드 및 GHCR 푸시:"
-echo "      ./2.build_and_push_ghcr.sh"
-echo ""
-echo "   3. ArgoCD 배포 (선택사항):"
-echo "      make bootstrap && make deploy"
-echo ""
-echo "   4. 또는 Helm 직접 배포:"
+echo "   2. Helm 배포:"
 echo "      make helm-install-all ENV=dev"
 echo ""
-echo "   5. 접근:"
-echo "      http://localhost:8080/"
+echo "   3. 또는 ArgoCD로 GitOps 배포:"
+echo "      make argo-bootstrap && make argo-deploy"
+echo ""
+echo "   4. 접근:"
+echo "      https://api.dev.wealist.co.kr/"
 echo "=============================================="
