@@ -269,6 +269,12 @@ prometheus:
   config:
     externalUrl: "https://dev.wealist.co.kr/api/monitoring/prometheus"
     routePrefix: "/api/monitoring/prometheus"
+  # Kind 클러스터: 호스트 머신에 데이터 영속화 (클러스터 재생성 시에도 유지)
+  persistence:
+    enabled: true
+    hostPath:
+      enabled: true
+      path: /data/prometheus  # Kind extraMounts: /data/wealist-dev → /data
 
 # Loki - 로그 수집
 loki:
