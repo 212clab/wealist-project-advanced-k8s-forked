@@ -4,19 +4,19 @@ name: Build and Push Images to ECR
 on:
   push:
     branches:
-      - service-deploy-dev   # dev 환경 배포
-      - service-deploy-prod  # prod 환경 배포
+      - service-deploy-dev # dev 환경 배포
+      - service-deploy-prod # prod 환경 배포
     paths:
-      - 'services/**'
-      - 'packages/wealist-advanced-go-pkg/**'  # 공통 모듈 변경 감지
+      - "services/**"
+      - "packages/wealist-advanced-go-pkg/**" # 공통 모듈 변경 감지
   workflow_dispatch:
     inputs:
       services:
-        description: 'Services to build (comma-separated, e.g., user-service,board-service). Leave empty for all services.'
+        description: "Services to build (comma-separated, e.g., user-service,board-service). Leave empty for all services."
         required: false
         type: string
       environment:
-        description: 'Target environment'
+        description: "Target environment"
         required: true
         type: choice
         options:
@@ -24,7 +24,7 @@ on:
           - prod
         default: dev
       skip_gitops:
-        description: 'Skip GitOps update trigger'
+        description: "Skip GitOps update trigger"
         required: false
         type: boolean
         default: false
@@ -156,9 +156,9 @@ jobs:
       fail-fast: false
 
     permissions:
-      id-token: write  # OIDC 인증용
+      id-token: write # OIDC 인증용
       contents: read
-      security-events: write  # Trivy 결과를 Security 탭에 올리기 위해 필요
+      security-events: write # Trivy 결과를 Security 탭에 올리기 위해 필요
 
     steps:
       - uses: actions/checkout@v4
@@ -247,8 +247,8 @@ jobs:
           context: ${{ steps.build-config.outputs.context }}
           file: ${{ steps.build-config.outputs.dockerfile }}
           platforms: linux/amd64
-          load: true               # 로컬 도커 데몬으로 이미지 로드
-          push: false              # 푸시하지 않음
+          load: true # 로컬 도커 데몬으로 이미지 로드
+          push: false # 푸시하지 않음
           tags: ${{ matrix.service }}:scan-temp
           cache-from: type=gha,scope=${{ matrix.service }}-${{ needs.detect-changes.outputs.environment }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ needs.detect-changes.outputs.environment }}
@@ -262,28 +262,28 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ matrix.service }}:scan-temp
-          format: 'table'
-          exit-code: '0'
+          format: "table"
+          exit-code: "0"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
 
       # B. Security 탭 업로드용 (SARIF 생성)
       - name: Run Trivy (SARIF Output)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ matrix.service }}:scan-temp
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '0'
+          format: "sarif"
+          output: "trivy-results.sarif"
+          exit-code: "0"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
           category: ${{ matrix.service }}
 
       # -------------------------------------------------------------------------
@@ -418,14 +418,18 @@ jobs:
           git diff --name-only
 
           git add .
-          git commit -m "🚀 [${NAMESPACE}] Update image tags for services" \
-            -m "Services: ${{ needs.detect-changes.outputs.services }}" \
-            -m "Environment: ${{ needs.detect-changes.outputs.environment }}" \
-            -m "ECR Registry: ${ECR_REGISTRY}" \
-            -m "New Tag: ${NEW_TAG}" \
-            -m "Commit: ${{ github.sha }}" \
-            -m "Updated by: ${{ github.actor }}" \
-            -m "Triggered by: ${{ github.event_name }}"
+
+          # 멀티라인 커밋 메시지
+          COMMIT_MSG="🚀 [${NAMESPACE}] Update image tags for services"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n\n'"Services: ${{ needs.detect-changes.outputs.services }}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n'"Environment: ${{ needs.detect-changes.outputs.environment }}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n'"ECR Registry: ${ECR_REGISTRY}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n'"New Tag: ${NEW_TAG}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n'"Commit: ${{ github.sha }}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n\n'"Updated by: ${{ github.actor }}"
+          COMMIT_MSG="${COMMIT_MSG}"$'\n'"Triggered by: ${{ github.event_name }}"
+
+          git commit -m "${COMMIT_MSG}"
 
           git push origin ${K8S_BRANCH}
 

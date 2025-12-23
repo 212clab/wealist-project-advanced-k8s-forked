@@ -13,8 +13,8 @@ global:
   environment: development
   domain: dev.wealist.co.kr
   # AWS ECR 레지스트리 (Kind-dev, EKS 모두 사용)
-  # TODO: <AWS_ACCOUNT_ID>를 실제 AWS 계정 ID로 교체하세요
-  imageRegistry: "<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com"
+  # TODO: 290008131187를 실제 AWS 계정 ID로 교체하세요
+  imageRegistry: "290008131187.dkr.ecr.ap-northeast-2.amazonaws.com"
 
 # imagePullSecrets
 # - Kind + ECR: ecr-secret 필요 (aws ecr get-login-password로 생성)
@@ -228,6 +228,7 @@ istio:
   authorizationPolicy:
     enabled: true
     denyAll: true  # dev: 기본 거부 (Zero Trust)
+    allowSameNamespace: false  # dev: 같은 네임스페이스 내 자동 허용 비활성화
 
   # 서비스별 호출 권한 (L7 정책)
   serviceAuthorization:
