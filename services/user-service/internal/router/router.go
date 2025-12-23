@@ -101,7 +101,7 @@ func Setup(cfg Config) *gin.Engine {
 	attachmentService := service.NewAttachmentService(attachmentRepo, cfg.S3Client, cfg.Logger)
 
 	// Initialize handlers
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, workspaceService)
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 	profileHandler := handler.NewProfileHandler(profileService, attachmentService)
 
@@ -134,6 +134,14 @@ func Setup(cfg Config) *gin.Engine {
 	{
 		internal.GET("/users/:userId/exists", userHandler.UserExists)
 		internal.POST("/oauth/login", userHandler.OAuthLogin)
+	}
+
+	// ============================================================
+	// Statistics routes (for dashboard - no auth required)
+	// ============================================================
+	statistics := api.Group("/statistics")
+	{
+		statistics.GET("/users", userHandler.GetStatistics)
 	}
 
 	// ============================================================

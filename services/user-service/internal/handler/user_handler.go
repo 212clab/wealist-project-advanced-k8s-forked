@@ -12,12 +12,16 @@ import (
 
 // UserHandler handles user HTTP requests
 type UserHandler struct {
-	userService *service.UserService
+	userService      *service.UserService
+	workspaceService *service.WorkspaceService
 }
 
 // NewUserHandler creates a new UserHandler
-func NewUserHandler(userService *service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService *service.UserService, workspaceService *service.WorkspaceService) *UserHandler {
+	return &UserHandler{
+		userService:      userService,
+		workspaceService: workspaceService,
+	}
 }
 
 // CreateUser godoc
@@ -235,4 +239,29 @@ func (h *UserHandler) UserExists(c *gin.Context) {
 	}
 
 	response.OK(c, gin.H{"exists": exists})
+}
+
+// GetStatistics godoc
+// @Summary Get user statistics for dashboard
+// @Tags Statistics
+// @Produce json
+// @Success 200 {object} domain.UserStatistics
+// @Failure 500 {object} ErrorResponse
+// @Router /statistics/users [get]
+func (h *UserHandler) GetStatistics(c *gin.Context) {
+	stats, err := h.userService.GetStatistics()
+	if err != nil {
+		response.InternalErrorWithDetails(c, "Failed to get user statistics", err)
+		return
+	}
+
+	// Add workspace count if workspace service is available
+	if h.workspaceService != nil {
+		workspaceCount, err := h.workspaceService.CountTotal()
+		if err == nil {
+			stats.TotalWorkspaces = workspaceCount
+		}
+	}
+
+	response.OK(c, stats)
 }

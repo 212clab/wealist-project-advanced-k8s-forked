@@ -68,6 +68,7 @@ func (s *UserService) CreateUser(req domain.CreateUserRequest) (*domain.User, er
 	// 메트릭 기록: 사용자 생성 성공
 	if s.metrics != nil {
 		s.metrics.RecordUserCreated()
+		s.metrics.RecordUserRegistration()
 	}
 
 	s.logger.Info("User created", zap.String("userId", user.ID.String()))
@@ -191,6 +192,10 @@ func (s *UserService) FindOrCreateOAuthUser(email, name, provider string) (*doma
 				s.logger.Error("Failed to update user name", zap.Error(err))
 			}
 		}
+		// 메트릭 기록: 기존 사용자 로그인
+		if s.metrics != nil {
+			s.metrics.RecordUserLogin()
+		}
 		s.logger.Info("Existing user found for OAuth", zap.String("userId", user.ID.String()))
 		return user, nil
 	}
@@ -215,11 +220,65 @@ func (s *UserService) FindOrCreateOAuthUser(email, name, provider string) (*doma
 		return nil, err
 	}
 
-	// 메트릭 기록: OAuth 사용자 생성 성공
+	// 메트릭 기록: OAuth 사용자 생성 및 로그인 성공
 	if s.metrics != nil {
 		s.metrics.RecordUserCreated()
+		s.metrics.RecordUserRegistration()
+		s.metrics.RecordUserLogin()
 	}
 
 	s.logger.Info("OAuth user created", zap.String("userId", newUser.ID.String()), zap.String("email", email))
 	return newUser, nil
+}
+
+// GetStatistics returns user statistics for dashboard
+func (s *UserService) GetStatistics() (*domain.UserStatistics, error) {
+	stats := &domain.UserStatistics{}
+
+	// Total users
+	totalUsers, err := s.userRepo.CountTotal()
+	if err != nil {
+		s.logger.Error("Failed to count total users", zap.Error(err))
+		return nil, err
+	}
+	stats.TotalUsers = totalUsers
+
+	// Today registrations
+	todayReg, err := s.userRepo.CountTodayRegistrations()
+	if err != nil {
+		s.logger.Error("Failed to count today registrations", zap.Error(err))
+		return nil, err
+	}
+	stats.TodayRegistrations = todayReg
+
+	// Daily registrations (last 7 days)
+	dailyReg, err := s.userRepo.CountRegistrationsByPeriod(7)
+	if err != nil {
+		s.logger.Error("Failed to get daily registrations", zap.Error(err))
+		return nil, err
+	}
+	stats.DailyRegistrations = dailyReg
+
+	// Weekly registrations (last 4 weeks)
+	weeklyReg, err := s.userRepo.CountRegistrationsByPeriod(28)
+	if err != nil {
+		s.logger.Error("Failed to get weekly registrations", zap.Error(err))
+		return nil, err
+	}
+	stats.WeeklyRegistrations = weeklyReg
+
+	// Monthly registrations (last 12 months = ~365 days)
+	monthlyReg, err := s.userRepo.CountRegistrationsByPeriod(365)
+	if err != nil {
+		s.logger.Error("Failed to get monthly registrations", zap.Error(err))
+		return nil, err
+	}
+	stats.MonthlyRegistrations = monthlyReg
+
+	// Update metrics
+	if s.metrics != nil {
+		s.metrics.SetUsersTotal(totalUsers)
+	}
+
+	return stats, nil
 }

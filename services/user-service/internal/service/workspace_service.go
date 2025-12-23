@@ -283,3 +283,19 @@ func (s *WorkspaceService) SetDefaultWorkspace(userID, workspaceID uuid.UUID) er
 
 	return s.memberRepo.SetDefault(userID, workspaceID)
 }
+
+// CountTotal returns total number of active workspaces
+func (s *WorkspaceService) CountTotal() (int64, error) {
+	count, err := s.workspaceRepo.CountTotal()
+	if err != nil {
+		s.logger.Error("Failed to count total workspaces", zap.Error(err))
+		return 0, err
+	}
+
+	// Update metrics
+	if s.metrics != nil {
+		s.metrics.SetWorkspacesTotal(count)
+	}
+
+	return count, nil
+}

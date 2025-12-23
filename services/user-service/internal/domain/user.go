@@ -76,3 +76,21 @@ func (u *User) ToResponse() UserResponse {
 		DeletedAt: u.DeletedAt,
 	}
 }
+
+// DailyCount represents count data for a specific date
+type DailyCount struct {
+	Date  time.Time `json:"date"`
+	Count int64     `json:"count"`
+}
+
+// UserStatistics represents user statistics for dashboard
+type UserStatistics struct {
+	TotalUsers           int64        `json:"totalUsers"`
+	TotalWorkspaces      int64        `json:"totalWorkspaces"`
+	TodayRegistrations   int64        `json:"todayRegistrations"`
+	DailyActiveUsers     int64        `json:"dailyActiveUsers"`
+	MonthlyActiveUsers   int64        `json:"monthlyActiveUsers"`
+	DailyRegistrations   []DailyCount `json:"dailyRegistrations,omitempty"`
+	WeeklyRegistrations  []DailyCount `json:"weeklyRegistrations,omitempty"`
+	MonthlyRegistrations []DailyCount `json:"monthlyRegistrations,omitempty"`
+}

@@ -79,3 +79,10 @@ func (r *WorkspaceRepository) Exists(id uuid.UUID) (bool, error) {
 	err := r.db.Model(&domain.Workspace{}).Where("id = ? AND is_active = true AND deleted_at IS NULL", id).Count(&count).Error
 	return count > 0, err
 }
+
+// CountTotal returns total number of active workspaces
+func (r *WorkspaceRepository) CountTotal() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.Workspace{}).Where("is_active = true AND deleted_at IS NULL").Count(&count).Error
+	return count, err
+}

@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -92,4 +94,39 @@ func (r *UserRepository) Exists(id uuid.UUID) (bool, error) {
 	var count int64
 	err := r.db.Model(&domain.User{}).Where("id = ? AND is_active = true AND deleted_at IS NULL", id).Count(&count).Error
 	return count > 0, err
+}
+
+// CountTotal returns total number of active users
+func (r *UserRepository) CountTotal() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.User{}).Where("is_active = true AND deleted_at IS NULL").Count(&count).Error
+	return count, err
+}
+
+// CountRegisteredSince returns number of users registered since the given time
+func (r *UserRepository) CountRegisteredSince(since time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.User{}).Where("created_at >= ? AND is_active = true AND deleted_at IS NULL", since).Count(&count).Error
+	return count, err
+}
+
+// CountTodayRegistrations returns number of users registered today
+func (r *UserRepository) CountTodayRegistrations() (int64, error) {
+	today := time.Now().Truncate(24 * time.Hour)
+	return r.CountRegisteredSince(today)
+}
+
+// CountRegistrationsByPeriod returns daily registration counts for the given period
+func (r *UserRepository) CountRegistrationsByPeriod(days int) ([]domain.DailyCount, error) {
+	var results []domain.DailyCount
+	startDate := time.Now().AddDate(0, 0, -days).Truncate(24 * time.Hour)
+
+	err := r.db.Model(&domain.User{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND is_active = true AND deleted_at IS NULL", startDate).
+		Group("DATE(created_at)").
+		Order("date ASC").
+		Scan(&results).Error
+
+	return results, err
 }

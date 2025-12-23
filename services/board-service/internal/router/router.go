@@ -81,6 +81,7 @@ func Setup(cfg Config) *gin.Engine {
 	commentRepo := repository.NewCommentRepository(cfg.DB)
 	fieldOptionRepo := repository.NewFieldOptionRepository(cfg.DB)
 	attachmentRepo := repository.NewAttachmentRepository(cfg.DB)
+	statisticsRepo := repository.NewStatisticsRepository(cfg.DB)
 
 	// Initialize converters
 	fieldOptionConverter := converter.NewFieldOptionConverter(fieldOptionRepo)
@@ -93,6 +94,7 @@ func Setup(cfg Config) *gin.Engine {
 	fieldOptionService := service.NewFieldOptionService(fieldOptionRepo)
 	projectMemberService := service.NewProjectMemberService(projectRepo, cfg.UserClient)
 	projectJoinRequestService := service.NewProjectJoinRequestService(projectRepo, cfg.UserClient)
+	statisticsService := service.NewStatisticsService(statisticsRepo, cfg.Metrics, cfg.Logger)
 
 	// Initialize handlers with service dependencies
 	projectHandler := handler.NewProjectHandler(projectService)
@@ -103,6 +105,7 @@ func Setup(cfg Config) *gin.Engine {
 	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
 	projectJoinRequestHandler := handler.NewProjectJoinRequestHandler(projectJoinRequestService)
 	attachmentHandler := handler.NewAttachmentHandler(cfg.S3Client, attachmentRepo)
+	statisticsHandler := handler.NewStatisticsHandler(statisticsService)
 
 	// 💡 WebSocket Handler 초기화
 	wsHandler := handler.NewWSHandler(cfg.Logger, cfg.UserClient)
@@ -123,6 +126,9 @@ func Setup(cfg Config) *gin.Engine {
 
 	// Swagger documentation endpoint
 	baseGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// Statistics endpoint (no authentication required - for dashboard)
+	baseGroup.GET("/statistics/boards", statisticsHandler.GetStatistics)
 
 	// Metrics endpoint (no authentication required)
 	// Add metrics endpoint at root level for compatibility

@@ -41,6 +41,15 @@ type Metrics struct {
 	ProfileCreatedTotal prometheus.Counter
 	// JoinRequestsTotal tracks the current number of pending join requests.
 	JoinRequestsTotal prometheus.Gauge
+
+	// UserLoginsTotal counts the total number of successful login events.
+	UserLoginsTotal prometheus.Counter
+	// UserRegistrationsTotal counts the total number of user registration events.
+	UserRegistrationsTotal prometheus.Counter
+	// DailyActiveUsers tracks the number of unique active users in the last 24 hours.
+	DailyActiveUsers prometheus.Gauge
+	// MonthlyActiveUsers tracks the number of unique active users in the last 30 days.
+	MonthlyActiveUsers prometheus.Gauge
 }
 
 // New creates and registers all metrics with the default Prometheus registerer.
@@ -112,6 +121,35 @@ func NewWithRegistry(registerer prometheus.Registerer) *Metrics {
 				Help:      "Total number of pending join requests",
 			},
 		),
+
+		UserLoginsTotal: factory.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "user_logins_total",
+				Help:      "Total number of successful login events",
+			},
+		),
+		UserRegistrationsTotal: factory.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "user_registrations_total",
+				Help:      "Total number of user registration events",
+			},
+		),
+		DailyActiveUsers: factory.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "daily_active_users",
+				Help:      "Number of unique active users in the last 24 hours",
+			},
+		),
+		MonthlyActiveUsers: factory.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "monthly_active_users",
+				Help:      "Number of unique active users in the last 30 days",
+			},
+		),
 	}
 }
 
@@ -153,4 +191,24 @@ func (m *Metrics) SetProfilesTotal(count int64) {
 // SetJoinRequestsTotal sets the number of pending join requests
 func (m *Metrics) SetJoinRequestsTotal(count int64) {
 	m.JoinRequestsTotal.Set(float64(count))
+}
+
+// RecordUserLogin increments the login counter
+func (m *Metrics) RecordUserLogin() {
+	m.UserLoginsTotal.Inc()
+}
+
+// RecordUserRegistration increments the registration counter
+func (m *Metrics) RecordUserRegistration() {
+	m.UserRegistrationsTotal.Inc()
+}
+
+// SetDailyActiveUsers sets the daily active users gauge
+func (m *Metrics) SetDailyActiveUsers(count int64) {
+	m.DailyActiveUsers.Set(float64(count))
+}
+
+// SetMonthlyActiveUsers sets the monthly active users gauge
+func (m *Metrics) SetMonthlyActiveUsers(count int64) {
+	m.MonthlyActiveUsers.Set(float64(count))
 }

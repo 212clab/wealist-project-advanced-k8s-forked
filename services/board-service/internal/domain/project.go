@@ -77,3 +77,19 @@ func (ProjectMember) TableName() string {
 func (ProjectJoinRequest) TableName() string {
 	return "project_join_requests"
 }
+
+// DailyCount represents count data for a specific date
+type DailyCount struct {
+	Date  time.Time `json:"date"`
+	Count int64     `json:"count"`
+}
+
+// BoardStatistics represents board service statistics for dashboard
+type BoardStatistics struct {
+	TotalProjects        int64        `json:"totalProjects"`
+	TotalBoards          int64        `json:"totalBoards"`
+	TodayProjects        int64        `json:"todayProjects"`
+	TodayBoards          int64        `json:"todayBoards"`
+	DailyProjectCreations []DailyCount `json:"dailyProjectCreations,omitempty"`
+	DailyBoardCreations   []DailyCount `json:"dailyBoardCreations,omitempty"`
+}
