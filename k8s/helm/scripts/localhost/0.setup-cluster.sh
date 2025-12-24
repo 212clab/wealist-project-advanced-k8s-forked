@@ -237,7 +237,7 @@ if [ -n "${AWS_ACCESS_KEY}" ] && [ -n "${AWS_SECRET_KEY}" ]; then
             -n wealist-localhost \
             --set global.namespace=wealist-localhost \
             --set aws.region=${AWS_REGION} \
-            --set externalSecrets.wealistSharedSecret.parameterPathPrefix=/wealist/localhost \
+            --set externalSecrets.wealistSharedSecret.parameterPathPrefix=/wealist/dev \
             --wait --timeout=60s 2>/dev/null || echo "⚠️ External Secrets 설정 배포 실패"
         echo "✅ External Secrets 설정 배포 완료"
     fi
