@@ -209,9 +209,20 @@ if helm list -n external-secrets 2>/dev/null | grep -q "external-secrets"; then
 else
     helm install external-secrets external-secrets/external-secrets \
         -n external-secrets --create-namespace \
+        --set installCRDs=true \
         --wait --timeout=120s
     echo "✅ External Secrets Operator 설치 완료"
 fi
+
+# CRD 준비 대기
+echo "⏳ External Secrets CRD 준비 대기 중..."
+for i in {1..30}; do
+    if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+        echo "✅ External Secrets CRD 준비 완료"
+        break
+    fi
+    sleep 1
+done
 
 # AWS 자격증명 Secret 생성
 AWS_ACCESS_KEY="${AWS_ACCESS_KEY_ID:-}"
