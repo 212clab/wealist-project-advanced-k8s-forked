@@ -50,3 +50,36 @@ output "aws_configure_commands" {
 
   EOT
 }
+
+# =============================================================================
+# Secrets Manager Outputs
+# =============================================================================
+output "secret_arns" {
+  description = "Map of secret names to their ARNs"
+  value       = module.secrets.secret_arns
+}
+
+output "secret_names" {
+  description = "List of created secret names"
+  value       = module.secrets.secret_names
+}
+
+output "secrets_usage_info" {
+  description = "Information on how to use the secrets"
+  value       = <<-EOT
+
+    # =============================================================================
+    # AWS Secrets Manager - 생성된 시크릿
+    # =============================================================================
+
+    시크릿 목록:
+    ${join("\n    ", module.secrets.secret_names)}
+
+    # AWS CLI로 시크릿 값 확인:
+    aws secretsmanager get-secret-value --secret-id wealist/dev/google-oauth --query SecretString --output text | jq
+
+    # External Secrets Operator에서 사용:
+    # k8s/helm/charts/external-secrets/ 참조
+
+  EOT
+}
