@@ -69,6 +69,10 @@ func (s *UserService) CreateUser(req domain.CreateUserRequest) (*domain.User, er
 	if s.metrics != nil {
 		s.metrics.RecordUserCreated()
 		s.metrics.RecordUserRegistration()
+		// Gauge 메트릭 업데이트: 전체 사용자 수
+		if count, err := s.userRepo.CountTotal(); err == nil {
+			s.metrics.SetUsersTotal(count)
+		}
 	}
 
 	s.logger.Info("User created", zap.String("userId", user.ID.String()))
@@ -225,6 +229,10 @@ func (s *UserService) FindOrCreateOAuthUser(email, name, provider string) (*doma
 		s.metrics.RecordUserCreated()
 		s.metrics.RecordUserRegistration()
 		s.metrics.RecordUserLogin()
+		// Gauge 메트릭 업데이트: 전체 사용자 수
+		if count, err := s.userRepo.CountTotal(); err == nil {
+			s.metrics.SetUsersTotal(count)
+		}
 	}
 
 	s.logger.Info("OAuth user created", zap.String("userId", newUser.ID.String()), zap.String("email", email))

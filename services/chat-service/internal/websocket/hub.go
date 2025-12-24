@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"chat-service/internal/domain"
+	"chat-service/internal/metrics"
 	"chat-service/internal/middleware"
 	"chat-service/internal/response"
 	"chat-service/internal/service"
@@ -45,6 +46,7 @@ type Hub struct {
 	validator       middleware.TokenValidator
 	redis           *redis.Client
 	logger          *zap.Logger
+	metrics         *metrics.Metrics
 }
 
 func NewHub(
@@ -53,6 +55,7 @@ func NewHub(
 	validator middleware.TokenValidator,
 	redis *redis.Client,
 	logger *zap.Logger,
+	m *metrics.Metrics,
 ) *Hub {
 	hub := &Hub{
 		chatRooms:       make(map[uuid.UUID]map[*Client]bool),
@@ -62,6 +65,7 @@ func NewHub(
 		validator:       validator,
 		redis:           redis,
 		logger:          logger,
+		metrics:         m,
 	}
 
 	// Start Redis subscription handler
@@ -169,6 +173,11 @@ func (h *Hub) registerClient(client *Client) {
 	}
 	h.userConnections[client.UserID][client] = true
 
+	// 메트릭 기록: WebSocket 연결 증가
+	if h.metrics != nil {
+		h.metrics.IncrementWebSocketConnections()
+	}
+
 	h.logger.Info("Client connected",
 		zap.String("userId", client.UserID.String()),
 		zap.String("chatId", client.ChatID.String()),
@@ -195,6 +204,11 @@ func (h *Hub) unregisterClient(client *Client) {
 			// User has no more connections, set offline
 			h.presenceService.SetUserOffline(context.Background(), client.UserID, client.WorkspaceID)
 		}
+	}
+
+	// 메트릭 기록: WebSocket 연결 감소
+	if h.metrics != nil {
+		h.metrics.DecrementWebSocketConnections()
 	}
 
 	close(client.Send)

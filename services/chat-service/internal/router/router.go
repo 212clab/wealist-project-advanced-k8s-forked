@@ -106,8 +106,8 @@ func Setup(routerCfg RouterConfig) *gin.Engine {
 			zap.String("jwt_issuer", cfg.Auth.JWTIssuer))
 	}
 
-	// Initialize WebSocket hub
-	wsHub := websocket.NewHub(chatService, presenceService, wsValidator, redisClient, logger)
+	// Initialize WebSocket hub (메트릭 연동)
+	wsHub := websocket.NewHub(chatService, presenceService, wsValidator, redisClient, logger, m)
 
 	// Initialize handlers
 	chatHandler := handler.NewChatHandler(chatService, presenceService, logger)

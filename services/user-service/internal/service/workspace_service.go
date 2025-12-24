@@ -97,6 +97,10 @@ func (s *WorkspaceService) CreateWorkspace(ownerID uuid.UUID, req domain.CreateW
 	// 메트릭 기록: 워크스페이스 생성 성공
 	if s.metrics != nil {
 		s.metrics.RecordWorkspaceCreated()
+		// Gauge 메트릭 업데이트: 전체 워크스페이스 수
+		if count, err := s.workspaceRepo.CountTotal(); err == nil {
+			s.metrics.SetWorkspacesTotal(count)
+		}
 	}
 
 	// 소유자를 멤버로 추가
