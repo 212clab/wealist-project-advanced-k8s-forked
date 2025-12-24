@@ -32,18 +32,29 @@ image_exists() {
     curl -sf "http://${LOCAL_REG}/v2/${name}/manifests/${tag}" > /dev/null 2>&1
 }
 
-# Docker Hub에서 이미지 로드
+# Docker Hub에서 이미지 로드 (로컬 이미지 우선 사용)
 load_from_dockerhub() {
     local src=$1 name=$2 tag=$3
 
+    # 1. 로컬 레지스트리에 이미 있으면 스킵
     if image_exists "$name" "$tag"; then
         echo "✓ ${name}:${tag} - 이미 있음 (스킵)"
         return
     fi
 
     echo "📦 ${name}:${tag}"
-    echo "   Docker Hub: $src"
 
+    # 2. 로컬 Docker에 이미지 있는지 확인 (pull 없이 사용)
+    if docker image inspect "$src" >/dev/null 2>&1; then
+        echo "   ✅ 로컬 Docker에서 발견 - Docker Hub 스킵"
+        docker tag "$src" "${LOCAL_REG}/${name}:${tag}"
+        docker push "${LOCAL_REG}/${name}:${tag}"
+        echo "   ✅ 로드 완료"
+        return
+    fi
+
+    # 3. 로컬에 없으면 Docker Hub에서 pull
+    echo "   Docker Hub: $src"
     if docker pull --platform linux/amd64 "$src" 2>/dev/null; then
         docker tag "$src" "${LOCAL_REG}/${name}:${tag}"
         docker push "${LOCAL_REG}/${name}:${tag}"
