@@ -204,25 +204,54 @@ echo "🔐 External Secrets Operator 설치 중..."
 helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
 helm repo update external-secrets 2>/dev/null || true
 
-if helm list -n external-secrets 2>/dev/null | grep -q "external-secrets"; then
-    echo "✅ External Secrets Operator 이미 설치됨"
-else
-    helm install external-secrets external-secrets/external-secrets \
-        -n external-secrets --create-namespace \
-        --set installCRDs=true \
-        --wait --timeout=120s
-    echo "✅ External Secrets Operator 설치 완료"
+# 기존 설치 삭제 후 재설치 (CRD 포함 확실히 설치)
+if helm list -n external-secrets 2>/dev/null | grep -q "^external-secrets"; then
+    echo "기존 ESO 삭제 후 재설치 중..."
+    helm uninstall external-secrets -n external-secrets --wait 2>/dev/null || true
+    sleep 3
 fi
 
-# CRD 준비 대기
+# ESO 설치 (CRD 포함)
+echo "⏳ External Secrets Operator + CRD 설치 중..."
+helm install external-secrets external-secrets/external-secrets \
+    -n external-secrets --create-namespace \
+    --set installCRDs=true \
+    --set webhook.port=9443 \
+    --wait --timeout=180s
+
+if [ $? -eq 0 ]; then
+    echo "✅ External Secrets Operator 설치 완료"
+else
+    echo "❌ External Secrets Operator 설치 실패"
+    exit 1
+fi
+
+# CRD 준비 대기 (필수 - 실패 시 종료)
 echo "⏳ External Secrets CRD 준비 대기 중..."
-for i in {1..30}; do
-    if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+CRD_READY=false
+for i in {1..60}; do
+    if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1 && \
+       kubectl get crd clustersecretstores.external-secrets.io >/dev/null 2>&1; then
         echo "✅ External Secrets CRD 준비 완료"
+        CRD_READY=true
         break
     fi
-    sleep 1
+    echo "   CRD 대기 중... ($i/60)"
+    sleep 2
 done
+
+if [ "$CRD_READY" = "false" ]; then
+    echo "❌ External Secrets CRD가 설치되지 않았습니다!"
+    echo "   수동 확인: kubectl get crd | grep external-secrets"
+    exit 1
+fi
+
+# ESO Controller Pod 준비 대기
+echo "⏳ ESO Controller Pod 준비 대기 중..."
+kubectl wait --namespace external-secrets \
+    --for=condition=ready pod \
+    --selector=app.kubernetes.io/name=external-secrets \
+    --timeout=120s || echo "WARNING: ESO controller not ready yet"
 
 # AWS 자격증명 Secret 생성
 AWS_ACCESS_KEY="${AWS_ACCESS_KEY_ID:-}"
@@ -241,30 +270,12 @@ if [ -n "${AWS_ACCESS_KEY}" ] && [ -n "${AWS_SECRET_KEY}" ]; then
         --from-literal=AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY}" \
         --from-literal=AWS_SECRET_ACCESS_KEY="${AWS_SECRET_KEY}"
     echo "✅ AWS 자격증명 Secret 생성 완료"
-
-    # External Secrets Chart 배포
-    if [ -d "${HELM_DIR}/charts/external-secrets" ]; then
-        helm upgrade --install external-secrets-config "${HELM_DIR}/charts/external-secrets" \
-            -n wealist-localhost \
-            --set global.namespace=wealist-localhost \
-            --set aws.region=${AWS_REGION} \
-            --set externalSecrets.wealistSharedSecret.parameterPathPrefix=/wealist/dev \
-            --wait --timeout=60s 2>/dev/null || echo "⚠️ External Secrets 설정 배포 실패"
-        echo "✅ External Secrets 설정 배포 완료"
-    fi
 else
-    echo "❌ AWS 자격증명을 찾을 수 없습니다!"
-    echo "   다음 방법 중 하나로 설정하세요:"
-    echo ""
-    echo "   1. 환경변수:"
-    echo "      export AWS_ACCESS_KEY_ID=<your-key>"
-    echo "      export AWS_SECRET_ACCESS_KEY=<your-secret>"
-    echo ""
-    echo "   2. AWS CLI:"
-    echo "      aws configure"
-    echo ""
-    exit 1
+    echo "⚠️  AWS 자격증명 없음 - helm-install-all에서 ESO 설정됩니다"
 fi
+
+# External Secrets Config는 helm-install-all에서 설치됨 (CRD 의존성 문제 방지)
+echo "ℹ️  External Secrets 설정은 helm-install-all에서 자동 배포됩니다"
 
 echo ""
 echo "=============================================="
