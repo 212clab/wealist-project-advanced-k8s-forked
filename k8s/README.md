@@ -5,7 +5,7 @@
 ## 📁 프로젝트 구조
 
 - **charts/** - 각 서비스별 개별 Helm Chart
-- **environments/** - 환경별 설정 파일 (localhost, dev, staging)
+- **environments/** - 환경별 설정 파일 (localhost, dev, prod)
   - Chart 템플릿은 변경하지 않고, 모든 환경에서 공통으로 사용합니다
   - 환경별로 다른 값들만 이 디렉토리에서 관리합니다
 
