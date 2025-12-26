@@ -20,6 +20,7 @@ terraform {
       version = "~> 5.0"
     }
   }
+
   backend "s3" {
     bucket         = "wealist-tf-state-advanced-k8s"
     key            = "dev-enviorment/terraform.tfstate" # 폴더마다 달라야합니다.
