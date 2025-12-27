@@ -22,9 +22,9 @@ spec:
         - name: image.tag
           value: "prod-latest"
         - name: externalSecrets.enabled
+          value: "true"
         - name: config.DB_NAME
           value: "user_db"
-          value: "true"
   destination:
     server: https://kubernetes.default.svc
     namespace: wealist-prod
