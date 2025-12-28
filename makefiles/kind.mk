@@ -944,12 +944,16 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → ECR 이미지 사
 		echo "✅ 모든 서비스 이미지가 ECR에 존재합니다!"; \
 	fi
 	@echo ""
+	@echo ""
+# 	@$(MAKE) helm-install-infra ENV=dev
+	@echo ""
+	@echo ""
 	@echo "----------------------------------------------"
 	@echo "  [8/8] ArgoCD 설치 (GitOps)"
 	@echo "----------------------------------------------"
 	@echo ""
 	@echo "ArgoCD 설치 중..."
-	@$(MAKE) argo-install-simple
+	@$(MAKE) argo-setup
 	@echo ""
 	@echo "✅ ArgoCD 설치 완료!"
 	@echo ""
@@ -1307,11 +1311,6 @@ kind-info: ## 클러스터 배포 정보 (Git 레포/브랜치/배포자) 확인
 		DEPLOYED_BY_EMAIL=$$(kubectl get namespace $(K8S_NAMESPACE) -o jsonpath='{.metadata.annotations.wealist\.io/deployed-by-email}' 2>/dev/null); \
 		DEPLOY_TIME=$$(kubectl get namespace $(K8S_NAMESPACE) -o jsonpath='{.metadata.annotations.wealist\.io/deploy-time}' 2>/dev/null); \
 		ISTIO_MODE=$$(kubectl get namespace $(K8S_NAMESPACE) -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}' 2>/dev/null); \
-		if [ -z "$$GIT_REPO" ]; then GIT_REPO=$$(git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||' | sed 's|\.git$$||'); fi; \
-		if [ -z "$$GIT_BRANCH" ]; then GIT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null); fi; \
-		if [ -z "$$GIT_COMMIT" ]; then GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null); fi; \
-		if [ -z "$$DEPLOYED_BY" ]; then DEPLOYED_BY=$$(git config --get user.name 2>/dev/null); fi; \
-		if [ -z "$$DEPLOYED_BY_EMAIL" ]; then DEPLOYED_BY_EMAIL=$$(git config --get user.email 2>/dev/null); fi; \
 		echo "  📦 Git Repository"; \
 		echo "    - Repo:     https://github.com/$${GIT_REPO:-unknown}"; \
 		echo "    - Branch:   $${GIT_BRANCH:-unknown}"; \
@@ -1320,7 +1319,7 @@ kind-info: ## 클러스터 배포 정보 (Git 레포/브랜치/배포자) 확인
 		echo "  👤 배포자 정보"; \
 		echo "    - Name:     $${DEPLOYED_BY:-unknown}"; \
 		echo "    - Email:    $${DEPLOYED_BY_EMAIL:-unknown}"; \
-		echo "    - Time:     $${DEPLOY_TIME:-(not recorded)}"; \
+		echo "    - Time:     $${DEPLOY_TIME:-unknown}"; \
 		echo ""; \
 		echo "  🔧 클러스터 설정"; \
 		echo "    - Namespace: $(K8S_NAMESPACE)"; \
