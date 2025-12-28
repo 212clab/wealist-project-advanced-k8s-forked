@@ -34,17 +34,18 @@ provider "helm" {
 # =============================================================================
 # 1. Gateway API CRDs (Istio Ambient 필수)
 # =============================================================================
-resource "helm_release" "gateway_api_crds" {
-  name       = "gateway-api-crds"
-  repository = "https://kubernetes-sigs.github.io/gateway-api"
-  chart      = "gateway-api"
-  version    = "1.2.0"
-  namespace  = "kube-system"
+# Gateway API는 Helm 차트가 없으므로 kubectl apply로 설치
+resource "null_resource" "gateway_api_crds" {
+  triggers = {
+    cluster_name = module.eks.cluster_name
+    version      = "v1.2.0"
+  }
 
-  # CRDs만 설치
-  set {
-    name  = "installCRDs"
-    value = "true"
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region}
+      kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+    EOT
   }
 
   depends_on = [module.eks]
@@ -62,7 +63,7 @@ resource "helm_release" "istio_base" {
 
   create_namespace = true
 
-  depends_on = [helm_release.gateway_api_crds]
+  depends_on = [null_resource.gateway_api_crds]
 }
 
 resource "helm_release" "istiod" {
@@ -105,72 +106,16 @@ resource "helm_release" "istio_ztunnel" {
   depends_on = [helm_release.istio_cni]
 }
 
-# Istio Ingress Gateway (for external traffic)
-resource "helm_release" "istio_ingress" {
-  name       = "istio-ingressgateway"
-  repository = "https://istio-release.storage.googleapis.com/charts"
-  chart      = "gateway"
-  version    = "1.28.2"
-  namespace  = "istio-system"
-
-  # AWS ALB를 통한 외부 노출
-  set {
-    name  = "service.type"
-    value = "LoadBalancer"
-  }
-
-  # AWS Load Balancer Controller annotations
-  set {
-    name  = "service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
-    value = "external"
-  }
-
-  set {
-    name  = "service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-nlb-target-type"
-    value = "ip"
-  }
-
-  set {
-    name  = "service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
-    value = "internet-facing"
-  }
-
-  # SSL 정책 (CloudFront에서 처리하므로 HTTP만)
-  set {
-    name  = "service.ports[0].name"
-    value = "http"
-  }
-
-  set {
-    name  = "service.ports[0].port"
-    value = "80"
-  }
-
-  set {
-    name  = "service.ports[0].targetPort"
-    value = "80"
-  }
-
-  set {
-    name  = "service.ports[1].name"
-    value = "https"
-  }
-
-  set {
-    name  = "service.ports[1].port"
-    value = "443"
-  }
-
-  set {
-    name  = "service.ports[1].targetPort"
-    value = "443"
-  }
-
-  depends_on = [
-    helm_release.istio_ztunnel,
-    helm_release.aws_load_balancer_controller
-  ]
-}
+# =============================================================================
+# Istio Ingress Gateway - MOVED TO ArgoCD
+# =============================================================================
+# Istio Ingress Gateway는 ALB Controller가 필요하므로 ArgoCD에서 관리
+# ArgoCD App: cluster-addons (sync-wave: 0)
+#
+# 설치 순서:
+# 1. ArgoCD: AWS Load Balancer Controller (sync-wave: -2)
+# 2. ArgoCD: Istio Ingress Gateway (sync-wave: 0)
+# =============================================================================
 
 # =============================================================================
 # 3. ArgoCD
@@ -214,269 +159,40 @@ resource "helm_release" "argocd" {
   depends_on = [helm_release.istio_ztunnel]
 }
 
-# -----------------------------------------------------------------------------
-# AWS Load Balancer Controller
-# -----------------------------------------------------------------------------
-# Pod Identity로 IAM 권한 부여 (pod-identity.tf 참조)
-resource "helm_release" "aws_load_balancer_controller" {
-  name       = "aws-load-balancer-controller"
-  repository = "https://aws.github.io/eks-charts"
-  chart      = "aws-load-balancer-controller"
-  version    = "1.7.1"  # 2024-12 stable version
-  namespace  = "kube-system"
-
-  set {
-    name  = "clusterName"
-    value = module.eks.cluster_name
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller"
-  }
-
-  # VPC ID for target group binding
-  set {
-    name  = "vpcId"
-    value = local.vpc_id
-  }
-
-  # Region
-  set {
-    name  = "region"
-    value = var.aws_region
-  }
-
-  # Enable WAF and Shield integrations
-  set {
-    name  = "enableShield"
-    value = "false"  # Enable if needed
-  }
-
-  set {
-    name  = "enableWaf"
-    value = "false"  # Enable if needed
-  }
-
-  set {
-    name  = "enableWafv2"
-    value = "false"  # Enable if needed
-  }
-
-  depends_on = [
-    module.eks,
-    module.pod_identity_alb_controller
-  ]
-}
-
-# -----------------------------------------------------------------------------
-# External Secrets Operator
-# -----------------------------------------------------------------------------
-resource "helm_release" "external_secrets" {
-  name       = "external-secrets"
-  repository = "https://charts.external-secrets.io"
-  chart      = "external-secrets"
-  version    = "0.9.11"  # 2024-12 stable version
-  namespace  = "external-secrets"
-
-  create_namespace = true
-
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "external-secrets"
-  }
-
-  depends_on = [
-    module.eks,
-    module.pod_identity_external_secrets
-  ]
-}
-
-# -----------------------------------------------------------------------------
-# cert-manager
-# -----------------------------------------------------------------------------
-resource "helm_release" "cert_manager" {
-  name       = "cert-manager"
-  repository = "https://charts.jetstack.io"
-  chart      = "cert-manager"
-  version    = "v1.14.3"  # 2024-12 stable version
-  namespace  = "cert-manager"
-
-  create_namespace = true
-
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "cert-manager"
-  }
-
-  depends_on = [
-    module.eks,
-    module.pod_identity_cert_manager
-  ]
-}
-
-# -----------------------------------------------------------------------------
-# Cluster Autoscaler
-# -----------------------------------------------------------------------------
-resource "helm_release" "cluster_autoscaler" {
-  name       = "cluster-autoscaler"
-  repository = "https://kubernetes.github.io/autoscaler"
-  chart      = "cluster-autoscaler"
-  version    = "9.35.0"  # 2024-12 stable version
-  namespace  = "kube-system"
-
-  set {
-    name  = "autoDiscovery.clusterName"
-    value = module.eks.cluster_name
-  }
-
-  set {
-    name  = "awsRegion"
-    value = var.aws_region
-  }
-
-  set {
-    name  = "rbac.serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "rbac.serviceAccount.name"
-    value = "cluster-autoscaler"
-  }
-
-  depends_on = [
-    module.eks,
-    module.pod_identity_cluster_autoscaler
-  ]
-}
-
 # =============================================================================
-# 4. ArgoCD Bootstrap (App of Apps Pattern)
+# Cluster Info ConfigMap (ArgoCD에서 참조)
 # =============================================================================
-# ArgoCD가 설치된 후 자동으로 모든 앱을 관리하도록 설정
-
-# wealist-prod 네임스페이스 생성
-resource "kubernetes_namespace" "wealist_prod" {
+# ArgoCD에서 cluster-addons 차트 배포 시 이 정보 사용
+resource "kubernetes_config_map" "cluster_info" {
   metadata {
-    name = "wealist-prod"
-    labels = {
-      "istio.io/dataplane-mode" = "ambient"
-    }
+    name      = "cluster-info"
+    namespace = "argocd"
+  }
+
+  data = {
+    CLUSTER_NAME = module.eks.cluster_name
+    AWS_REGION   = var.aws_region
+    VPC_ID       = local.vpc_id
   }
 
   depends_on = [helm_release.argocd]
 }
 
-# ArgoCD Project 생성 (wealist-prod)
-resource "kubernetes_manifest" "argocd_project_prod" {
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "AppProject"
-    metadata = {
-      name      = "wealist-prod"
-      namespace = "argocd"
-    }
-    spec = {
-      description = "Wealist Production Environment"
-      sourceRepos = [
-        "https://github.com/OrangesCloud/wealist-project-advanced-k8s.git"
-      ]
-      destinations = [
-        {
-          namespace = "wealist-prod"
-          server    = "https://kubernetes.default.svc"
-        },
-        {
-          namespace = "argocd"
-          server    = "https://kubernetes.default.svc"
-        },
-        {
-          namespace = "external-secrets"
-          server    = "https://kubernetes.default.svc"
-        },
-        {
-          namespace = "istio-system"
-          server    = "https://kubernetes.default.svc"
-        }
-      ]
-      clusterResourceWhitelist = [
-        {
-          group = ""
-          kind  = "Namespace"
-        },
-        {
-          group = "external-secrets.io"
-          kind  = "ClusterSecretStore"
-        }
-      ]
-      namespaceResourceWhitelist = [
-        {
-          group = "*"
-          kind  = "*"
-        }
-      ]
-    }
-  }
+# =============================================================================
+# Namespaces - ArgoCD에서 자동 생성 (CreateNamespace=true)
+# =============================================================================
+# external-secrets, cert-manager 네임스페이스는 ArgoCD가 생성/관리
 
-  depends_on = [helm_release.argocd]
-}
-
-# ArgoCD Root Application (App of Apps)
-resource "kubernetes_manifest" "argocd_root_app" {
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = "wealist-apps-prod"
-      namespace = "argocd"
-    }
-    spec = {
-      project = "wealist-prod"
-      source = {
-        repoURL        = "https://github.com/OrangesCloud/wealist-project-advanced-k8s.git"
-        targetRevision = "k8s-deploy-prod"
-        path           = "k8s/argocd/apps/prod"
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "argocd"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-        syncOptions = [
-          "CreateNamespace=true"
-        ]
-      }
-    }
-  }
-
-  depends_on = [
-    kubernetes_manifest.argocd_project_prod,
-    kubernetes_namespace.wealist_prod,
-    helm_release.external_secrets  # ExternalSecrets 먼저 설치 필요
-  ]
-}
+# =============================================================================
+# 4. ArgoCD Bootstrap - MOVED TO argocd-apps layer
+# =============================================================================
+# ArgoCD Project, Application은 별도 레이어에서 관리
+# 이유: kubernetes_manifest는 plan 시점에 클러스터 연결 필요
+#
+# 배포 순서:
+# 1. compute: EKS + Helm (ArgoCD 설치 포함)
+# 2. argocd-apps: ArgoCD Project + Application
+#
+# 다음 단계:
+# cd ../argocd-apps && terraform apply
+# =============================================================================
