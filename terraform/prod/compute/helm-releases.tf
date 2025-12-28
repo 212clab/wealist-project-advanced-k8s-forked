@@ -57,7 +57,7 @@ resource "helm_release" "istio_base" {
   name       = "istio-base"
   repository = "https://istio-release.storage.googleapis.com/charts"
   chart      = "base"
-  version    = "1.24.0"
+  version    = "1.28.2"
   namespace  = "istio-system"
 
   create_namespace = true
@@ -69,7 +69,7 @@ resource "helm_release" "istiod" {
   name       = "istiod"
   repository = "https://istio-release.storage.googleapis.com/charts"
   chart      = "istiod"
-  version    = "1.24.0"
+  version    = "1.28.2"
   namespace  = "istio-system"
 
   set {
@@ -84,7 +84,7 @@ resource "helm_release" "istio_cni" {
   name       = "istio-cni"
   repository = "https://istio-release.storage.googleapis.com/charts"
   chart      = "cni"
-  version    = "1.24.0"
+  version    = "1.28.2"
   namespace  = "istio-system"
 
   set {
@@ -99,7 +99,7 @@ resource "helm_release" "istio_ztunnel" {
   name       = "ztunnel"
   repository = "https://istio-release.storage.googleapis.com/charts"
   chart      = "ztunnel"
-  version    = "1.24.0"
+  version    = "1.28.2"
   namespace  = "istio-system"
 
   depends_on = [helm_release.istio_cni]
@@ -110,7 +110,7 @@ resource "helm_release" "istio_ingress" {
   name       = "istio-ingressgateway"
   repository = "https://istio-release.storage.googleapis.com/charts"
   chart      = "gateway"
-  version    = "1.24.0"
+  version    = "1.28.2"
   namespace  = "istio-system"
 
   # AWS ALB를 통한 외부 노출

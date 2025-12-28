@@ -134,3 +134,27 @@ resource "aws_secretsmanager_secret_version" "livekit" {
     ignore_changes = [secret_string]
   }
 }
+
+# -----------------------------------------------------------------------------
+# Grafana Admin Password (자동 생성)
+# -----------------------------------------------------------------------------
+# Grafana 대시보드 관리자 비밀번호
+resource "random_password" "grafana_admin" {
+  length  = 24
+  special = true
+}
+
+resource "aws_secretsmanager_secret" "grafana_admin" {
+  name       = "wealist/prod/monitoring/grafana"
+  kms_key_id = module.kms.key_arn
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "grafana_admin" {
+  secret_id = aws_secretsmanager_secret.grafana_admin.id
+  secret_string = jsonencode({
+    admin_user     = "admin"
+    admin_password = random_password.grafana_admin.result
+  })
+}
