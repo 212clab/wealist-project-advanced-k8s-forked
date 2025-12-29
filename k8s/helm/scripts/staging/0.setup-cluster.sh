@@ -219,6 +219,23 @@ else
     exit 1
 fi
 
+# 8-1. wealist-shared-secret 생성 (로컬 Kind 환경용)
+echo "🔐 wealist-shared-secret 생성 중..."
+kubectl create secret generic wealist-shared-secret \
+    --from-literal=DB_PASSWORD=postgres \
+    --from-literal=REDIS_PASSWORD="" \
+    --from-literal=S3_ACCESS_KEY=minioadmin \
+    --from-literal=S3_SECRET_KEY=minioadmin \
+    --from-literal=INTERNAL_API_KEY=internal-key-staging \
+    --from-literal=JWT_SECRET=staging-jwt-secret-change-in-production \
+    --from-literal=GOOGLE_CLIENT_ID=placeholder-client-id.apps.googleusercontent.com \
+    --from-literal=GOOGLE_CLIENT_SECRET=placeholder-client-secret \
+    --from-literal=LIVEKIT_API_KEY=devkey \
+    --from-literal=LIVEKIT_API_SECRET=devsecret \
+    -n ${NAMESPACE} \
+    --dry-run=client -o yaml | kubectl apply -f -
+echo "✅ wealist-shared-secret 생성 완료"
+
 # 9. 호스트 PostgreSQL/Redis 설정 (Kind 네트워크 허용)
 echo "🔐 호스트 PostgreSQL 설정 중 (Kind 네트워크 허용)..."
 
