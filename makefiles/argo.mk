@@ -1,9 +1,9 @@
 # ============================================
 # ArgoCD Makefile
 # ============================================
-.PHONY: argo-help cluster-up cluster-down bootstrap argo-clean argo-status helm-install-infra all
+.PHONY: argo-help cluster-up cluster-down bootstrap deploy argo-clean argo-status helm-install-infra all
 .PHONY: setup-local-argocd kind-setup-ecr load-infra-images-ecr
-.PHONY: argo-deploy-dev argo-deploy-prod
+.PHONY: argo-deploy-staging argo-deploy-dev argo-deploy-prod
 
 # 색상
 GREEN  := \033[0;32m
@@ -46,42 +46,10 @@ argo-help: ## [ArgoCD] 도움말 표시
 	@echo "  SEALED_SECRETS_KEY=$(SEALED_SECRETS_KEY)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-argo-setup: ## ArgoCD 설치 (인터랙티브)
-	@echo ""
-	@echo -e "$(YELLOW)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
-	@echo -e "$(YELLOW)  ArgoCD 설치 옵션 선택$(NC)"
-	@echo -e "$(YELLOW)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
-	@echo ""
-	@if [ -f "$(SEALED_SECRETS_KEY)" ]; then \
-		echo -e "$(GREEN)✅ Sealed Secrets 키 발견: $(SEALED_SECRETS_KEY)$(NC)"; \
-		echo ""; \
-		echo "1) 키 사용해서 설치 (Sealed Secrets 포함)"; \
-		echo "2) ArgoCD만 설치 (Sealed Secrets 없이) - 권장 for dev"; \
-		echo "3) 새 키 생성해서 설치"; \
-		echo ""; \
-		read -p "선택 [1/2/3] (기본: 1): " choice; \
-		case $$choice in \
-			2) $(MAKE) argo-install-simple ;; \
-			3) $(MAKE) bootstrap-without-key ;; \
-			*) $(MAKE) bootstrap ;; \
-		esac; \
-	else \
-		echo -e "$(YELLOW)⚠️  Sealed Secrets 키 없음$(NC)"; \
-		echo ""; \
-		echo "1) ArgoCD만 설치 (Sealed Secrets 없이) - 권장 for dev"; \
-		echo "2) 새 키 생성해서 설치 (Sealed Secrets 포함)"; \
-		echo "3) 키 파일 경로 직접 입력"; \
-		echo ""; \
-		read -p "선택 [1/2/3] (기본: 1): " choice; \
-		case $$choice in \
-			2) $(MAKE) bootstrap-without-key ;; \
-			3) read -p "키 파일 경로: " keypath; $(MAKE) bootstrap SEALED_SECRETS_KEY=$$keypath ;; \
-			*) $(MAKE) argo-install-simple ;; \
-		esac; \
-	fi
+argo-setup:  bootstrap ## argocd만 설치
 	@echo ""
 	@echo -e "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
-	@echo -e "$(GREEN)✅ ArgoCD 설치 완료!$(NC)"
+	@echo -e "$(GREEN)✅ 전체 배포 완료!$(NC)"
 	@echo -e "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo ""
 	@echo "ArgoCD UI: https://localhost:8079"
@@ -208,26 +176,33 @@ argo-ui: ## ArgoCD UI 포트 포워딩
 # 배포
 # ============================================
 
-argo-deploy-dev: ## [ArgoCD] Dev 환경 Applications 배포 (Root App 생성)
-	@echo -e "$(YELLOW)🎯 Dev Applications 배포 중...$(NC)"
+argo-deploy-staging: ## [ArgoCD] Staging 환경 Applications 배포 (Root App 생성)
+	@echo -e "$(YELLOW)🎯 Staging Applications 배포 중...$(NC)"
 	@echo ""
 	@echo "1. AppProject 생성..."
-	@kubectl apply -f k8s/argocd/apps/dev/project.yaml || true
-	@kubectl apply -f k8s/argocd/projects/wealist-dev.yaml || true
+	@kubectl apply -f k8s/argocd/apps/staging/project.yaml || true
+	@kubectl apply -f k8s/argocd/projects/wealist-staging.yaml || true
 	@echo ""
 	@echo "2. Root Application 생성..."
-	@kubectl apply -f k8s/argocd/apps/dev/root-app.yaml || true
+	@kubectl apply -f k8s/argocd/apps/staging/root-app.yaml || true
 	@echo ""
 	@echo "3. ArgoCD Sync 대기 중..."
 	@sleep 5
 	@echo ""
-	@echo -e "$(GREEN)✅ Dev 배포 완료$(NC)"
+	@echo -e "$(GREEN)✅ Staging 배포 완료$(NC)"
 	@echo ""
 	@echo "Applications 확인:"
 	@kubectl get applications -n argocd
 	@echo ""
 	@echo -e "$(YELLOW)📝 ArgoCD가 자동으로 모든 앱을 Sync합니다.$(NC)"
 	@echo "   상태 확인: make argo-status"
+
+argo-deploy-dev: ## [ArgoCD] Dev 환경 Applications 배포
+	@echo -e "$(YELLOW)🎯 Dev Applications 배포 중...$(NC)"
+	@kubectl apply -f k8s/argocd/apps/dev/project.yaml || true
+	@kubectl apply -f k8s/argocd/projects/wealist-dev.yaml || true
+	@kubectl apply -f k8s/argocd/apps/dev/root-app.yaml || true
+	@echo -e "$(GREEN)✅ Dev 배포 완료$(NC)"
 
 argo-deploy-prod: ## [ArgoCD] Prod 환경 Applications 배포
 	@echo -e "$(YELLOW)🎯 Prod Applications 배포 중...$(NC)"
