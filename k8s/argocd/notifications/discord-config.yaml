@@ -80,7 +80,7 @@ data:
       - on-deployed
       - on-sync-failed
       - on-sync-running
-      selector: metadata.labels.environment == 'production'
+      selector: metadata.labels.environment == production
 ---
 apiVersion: v1
 kind: Secret
