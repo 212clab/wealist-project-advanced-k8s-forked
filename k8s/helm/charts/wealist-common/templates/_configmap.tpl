@@ -32,4 +32,12 @@ data:
   {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- end }}
+  {{- /* Auto-generate DATABASE_URL for Go services if DB_NAME is set */}}
+  {{- if .Values.config.DB_NAME }}
+  {{- $dbHost := .Values.shared.config.DB_HOST | default "localhost" }}
+  {{- $dbPort := .Values.shared.config.DB_PORT | default "5432" }}
+  {{- $dbName := .Values.config.DB_NAME }}
+  {{- $dbUser := .Values.config.DB_USER | default (regexReplaceAll "wealist_(.*)_db" $dbName "${1}") }}
+  DATABASE_URL: {{ printf "postgresql://%s@%s:%s/%s?sslmode=disable" $dbUser $dbHost $dbPort $dbName | quote }}
+  {{- end }}
 {{- end }}
