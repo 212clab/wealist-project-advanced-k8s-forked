@@ -584,6 +584,71 @@ check-images: ## 로컬 레지스트리 이미지 확인
 	done
 
 # ============================================
+# External Secrets Operator (ESO)
+# ============================================
+
+eso-install: ## [ESO] External Secrets Operator 설치
+	@echo -e "$(YELLOW)🔐 External Secrets Operator 설치 중...$(NC)"
+	@kubectl create namespace external-secrets 2>/dev/null || true
+	@helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+	@helm repo update
+	@helm upgrade --install external-secrets external-secrets/external-secrets \
+		--namespace external-secrets \
+		--set installCRDs=true \
+		--wait --timeout 5m
+	@echo -e "$(GREEN)✅ ESO 설치 완료$(NC)"
+
+eso-setup-aws: ## [ESO] AWS 자격증명 Secret 생성 (ESO가 AWS Secrets Manager 접근용)
+	@echo -e "$(YELLOW)🔐 AWS 자격증명 설정 중...$(NC)"
+	@echo ""
+	@if [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then \
+		echo "환경변수 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY가 필요합니다."; \
+		echo ""; \
+		echo "설정 방법:"; \
+		echo "  export AWS_ACCESS_KEY_ID=<your-access-key>"; \
+		echo "  export AWS_SECRET_ACCESS_KEY=<your-secret-key>"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@kubectl create namespace external-secrets 2>/dev/null || true
+	@kubectl delete secret aws-credentials -n external-secrets 2>/dev/null || true
+	@kubectl create secret generic aws-credentials \
+		--from-literal=access-key="$$AWS_ACCESS_KEY_ID" \
+		--from-literal=secret-access-key="$$AWS_SECRET_ACCESS_KEY" \
+		-n external-secrets
+	@echo -e "$(GREEN)✅ AWS 자격증명 Secret 생성 완료$(NC)"
+
+eso-apply-staging: ## [ESO] Staging용 ClusterSecretStore + ExternalSecret 적용
+	@echo -e "$(YELLOW)🔐 ESO Staging 설정 적용 중...$(NC)"
+	@kubectl apply -f k8s/argocd/base/external-secrets/staging/cluster-secret-store-staging.yaml
+	@kubectl apply -f k8s/argocd/base/external-secrets/staging/external-secret-shared.yaml
+	@echo ""
+	@echo "ExternalSecret 상태 확인 중..."
+	@sleep 3
+	@kubectl get externalsecret -n wealist-staging
+	@echo -e "$(GREEN)✅ ESO Staging 설정 완료$(NC)"
+
+eso-status: ## [ESO] ExternalSecret 상태 확인
+	@echo -e "$(YELLOW)🔐 External Secrets 상태$(NC)"
+	@echo ""
+	@echo "ClusterSecretStore:"
+	@kubectl get clustersecretstores 2>/dev/null || echo "  없음"
+	@echo ""
+	@echo "ExternalSecrets:"
+	@kubectl get externalsecrets -A 2>/dev/null || echo "  없음"
+	@echo ""
+	@echo "ESO Pods:"
+	@kubectl get pods -n external-secrets 2>/dev/null || echo "  ESO 미설치"
+
+eso-sync: ## [ESO] ExternalSecret 강제 sync (wealist-shared-secret 재생성)
+	@echo -e "$(YELLOW)🔄 ExternalSecret sync 중...$(NC)"
+	@kubectl delete secret wealist-shared-secret -n wealist-staging 2>/dev/null || true
+	@kubectl annotate externalsecret wealist-shared-secret -n wealist-staging force-sync=$$(date +%s) --overwrite 2>/dev/null || true
+	@echo "⏳ Sync 대기 중..."
+	@sleep 5
+	@kubectl get secret wealist-shared-secret -n wealist-staging 2>/dev/null && echo -e "$(GREEN)✅ wealist-shared-secret 재생성 완료$(NC)" || echo -e "$(RED)❌ Secret 생성 실패$(NC)"
+
+# ============================================
 # 수정된 all 타겟
 # ============================================
 

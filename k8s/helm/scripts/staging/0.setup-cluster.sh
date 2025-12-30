@@ -225,22 +225,82 @@ else
     exit 1
 fi
 
-# 8-1. wealist-shared-secret 생성 (로컬 Kind 환경용)
-echo "🔐 wealist-shared-secret 생성 중..."
-kubectl create secret generic wealist-shared-secret \
-    --from-literal=DB_PASSWORD=postgres \
-    --from-literal=REDIS_PASSWORD="" \
-    --from-literal=S3_ACCESS_KEY=minioadmin \
-    --from-literal=S3_SECRET_KEY=minioadmin \
-    --from-literal=INTERNAL_API_KEY=internal-key-staging \
-    --from-literal=JWT_SECRET=staging-jwt-secret-change-in-production \
-    --from-literal=GOOGLE_CLIENT_ID=placeholder-client-id.apps.googleusercontent.com \
-    --from-literal=GOOGLE_CLIENT_SECRET=placeholder-client-secret \
-    --from-literal=LIVEKIT_API_KEY=devkey \
-    --from-literal=LIVEKIT_API_SECRET=devsecret \
-    -n ${NAMESPACE} \
-    --dry-run=client -o yaml | kubectl apply -f -
-echo "✅ wealist-shared-secret 생성 완료"
+# 8-1. External Secrets Operator (ESO) 설치 및 설정
+echo "🔐 External Secrets Operator (ESO) 설치 중..."
+
+# external-secrets 네임스페이스 생성
+kubectl create namespace external-secrets 2>/dev/null || true
+
+# ESO Helm 레포 추가 및 설치
+helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+helm repo update
+
+# ESO 설치 (이미 있으면 업그레이드)
+helm upgrade --install external-secrets external-secrets/external-secrets \
+    --namespace external-secrets \
+    --set installCRDs=true \
+    --wait --timeout 5m
+echo "✅ External Secrets Operator 설치 완료"
+
+# 8-2. AWS 자격증명 Secret 생성 (ESO가 AWS Secrets Manager 접근용)
+echo "🔐 AWS 자격증명 Secret 생성 중..."
+
+# AWS 자격증명 가져오기 (환경변수 또는 AWS CLI에서)
+AWS_ACCESS_KEY="${AWS_ACCESS_KEY_ID:-}"
+AWS_SECRET_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+
+# 환경변수 없으면 AWS CLI 설정에서 가져오기
+if [ -z "$AWS_ACCESS_KEY" ] || [ -z "$AWS_SECRET_KEY" ]; then
+    echo "  → 환경변수에서 AWS 자격증명을 찾을 수 없어 AWS CLI에서 가져옵니다..."
+    # AWS 프로필에서 자격증명 추출 시도
+    AWS_ACCESS_KEY=$(aws configure get aws_access_key_id 2>/dev/null || echo "")
+    AWS_SECRET_KEY=$(aws configure get aws_secret_access_key 2>/dev/null || echo "")
+fi
+
+if [ -z "$AWS_ACCESS_KEY" ] || [ -z "$AWS_SECRET_KEY" ]; then
+    echo "⚠️  AWS 자격증명을 찾을 수 없습니다."
+    echo ""
+    echo "   ESO를 사용하려면 다음 중 하나를 실행하세요:"
+    echo ""
+    echo "   1. 환경변수 설정 후 다시 실행:"
+    echo "      export AWS_ACCESS_KEY_ID=<your-access-key>"
+    echo "      export AWS_SECRET_ACCESS_KEY=<your-secret-key>"
+    echo ""
+    echo "   2. 수동으로 Secret 생성:"
+    echo "      kubectl create secret generic aws-credentials -n external-secrets \\"
+    echo "        --from-literal=access-key=<your-access-key> \\"
+    echo "        --from-literal=secret-access-key=<your-secret-key>"
+    echo ""
+    echo "   ESO 없이 진행합니다. (wealist-shared-secret은 ArgoCD가 생성)"
+else
+    # AWS 자격증명 Secret 생성
+    kubectl delete secret aws-credentials -n external-secrets 2>/dev/null || true
+    kubectl create secret generic aws-credentials \
+        --from-literal=access-key="${AWS_ACCESS_KEY}" \
+        --from-literal=secret-access-key="${AWS_SECRET_KEY}" \
+        -n external-secrets
+    echo "✅ AWS 자격증명 Secret 생성 완료"
+
+    # 8-3. ClusterSecretStore 적용
+    echo "🔐 ClusterSecretStore 적용 중..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    kubectl apply -f "${SCRIPT_DIR}/../../../argocd/base/external-secrets/staging/cluster-secret-store-staging.yaml"
+    echo "✅ ClusterSecretStore 적용 완료"
+
+    # 8-4. ExternalSecret 적용 (wealist-shared-secret 자동 생성)
+    echo "🔐 ExternalSecret 적용 중 (wealist-shared-secret 자동 생성)..."
+    # 기존 수동 생성 secret 삭제
+    kubectl delete secret wealist-shared-secret -n ${NAMESPACE} 2>/dev/null || true
+    kubectl apply -f "${SCRIPT_DIR}/../../../argocd/base/external-secrets/staging/external-secret-shared.yaml"
+    echo "✅ ExternalSecret 적용 완료"
+
+    # ESO sync 상태 확인
+    echo "⏳ ExternalSecret sync 대기 중..."
+    sleep 5
+    kubectl get externalsecret wealist-shared-secret -n ${NAMESPACE} 2>/dev/null || echo "  (ArgoCD가 나중에 생성)"
+fi
+
+echo "✅ ESO 설정 완료"
 
 # 9. 호스트 PostgreSQL/Redis 설정 (Kind 네트워크 허용)
 echo "🔐 호스트 PostgreSQL 설정 중 (Kind 네트워크 허용)..."
