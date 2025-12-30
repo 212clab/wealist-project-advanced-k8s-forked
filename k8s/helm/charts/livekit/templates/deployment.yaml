@@ -14,6 +14,9 @@ spec:
       labels:
         app: livekit
     spec:
+      # Disable automatic service environment variables injection
+      # Prevents LIVEKIT_PORT=tcp://... from conflicting with LiveKit's port flag
+      enableServiceLinks: false
       containers:
         - name: livekit
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
