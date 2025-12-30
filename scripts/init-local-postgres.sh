@@ -70,12 +70,38 @@ DATABASES_DEV=(
 
 # STAGING mode: 단일 wealist 유저 (ESO에서 사용하는 credentials와 동일)
 # 비밀번호는 AWS Secrets Manager의 wealist/staging/database/endpoint와 일치해야 함
+#
+# 방법 1: kubectl로 ESO 시크릿에서 자동 가져오기 (클러스터가 실행 중일 때)
+#   STAGING_DB_PASSWORD=$(kubectl get secret wealist-shared-secret -n wealist-staging \
+#       -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)
+#
+# 방법 2: 환경변수로 직접 지정
+#   export STAGING_DB_PASSWORD="your-aws-secret-password"
+#
+# 방법 3: 나중에 비밀번호 동기화 (클러스터 배포 후)
+#   sudo ./scripts/staging/fix-db-password.sh
+#
 STAGING_USER="wealist"
 STAGING_PASSWORD="${STAGING_DB_PASSWORD:-wealist-staging-password}"
 STAGING_DATABASE="wealist"
 
 # 모드에 따라 DATABASES 배열 설정 (main 함수에서 호출)
 set_databases_for_mode() {
+    # Try to auto-fetch from ESO if kubectl is available and default password is set
+    if [ "$MODE" = "staging" ] && [ "$STAGING_PASSWORD" = "wealist-staging-password" ]; then
+        if command -v kubectl &> /dev/null; then
+            ESO_PASS=$(kubectl get secret wealist-shared-secret -n wealist-staging \
+                -o jsonpath='{.data.DB_PASSWORD}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+            if [ -n "$ESO_PASS" ]; then
+                log_info "Auto-fetched password from ESO secret"
+                STAGING_PASSWORD="$ESO_PASS"
+            else
+                log_warn "Could not fetch ESO password - using default"
+                log_warn "Run 'sudo ./scripts/staging/fix-db-password.sh' after cluster deployment"
+            fi
+        fi
+    fi
+
     if [ "$MODE" = "staging" ]; then
         DATABASES=("${STAGING_DATABASE}:${STAGING_USER}:${STAGING_PASSWORD}")
         log_info "Staging 모드: 단일 wealist 유저 생성"
