@@ -511,21 +511,21 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → ECR 이미지 사
 	else \
 		echo "✅ istioctl: $$(istioctl version --short 2>/dev/null || echo '설치됨')"; \
 	fi
-# 	@echo ""
-# 	@echo "----------------------------------------------"
-# 	@echo "  [2/8] Secrets 파일 확인"
-# 	@echo "----------------------------------------------"
-# 	@echo ""
-# 	@if [ ! -f "./k8s/helm/environments/secrets.yaml" ]; then \
-# 		echo "⚠️  secrets.yaml 파일이 없습니다."; \
-# 		echo "   secrets.example.yaml에서 자동 생성합니다..."; \
-# 		echo ""; \
-# 		cp ./k8s/helm/environments/secrets.example.yaml ./k8s/helm/environments/secrets.yaml; \
-# 		echo "✅ secrets.yaml 생성 완료!"; \
-# 		echo ""; \
-# 	else \
-# 		echo "✅ secrets.yaml 파일 존재 확인"; \
-# 	fi
+	@echo ""
+	@echo "----------------------------------------------"
+	@echo "  [2/8] Secrets 파일 확인"
+	@echo "----------------------------------------------"
+	@echo ""
+	@if [ ! -f "./k8s/helm/environments/secrets.yaml" ]; then \
+		echo "⚠️  secrets.yaml 파일이 없습니다."; \
+		echo "   secrets.example.yaml에서 자동 생성합니다..."; \
+		echo ""; \
+		cp ./k8s/helm/environments/secrets.example.yaml ./k8s/helm/environments/secrets.yaml; \
+		echo "✅ secrets.yaml 생성 완료!"; \
+		echo ""; \
+	else \
+		echo "✅ secrets.yaml 파일 존재 확인"; \
+	fi
 	@echo ""
 	@echo "----------------------------------------------"
 	@echo "  [3/8] AWS 로그인 확인"
@@ -944,6 +944,10 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → ECR 이미지 사
 		echo "✅ 모든 서비스 이미지가 ECR에 존재합니다!"; \
 	fi
 	@echo ""
+	@echo ""
+# 	@$(MAKE) helm-install-infra ENV=dev
+	@echo ""
+	@echo ""
 	@echo "----------------------------------------------"
 	@echo "  [8/8] ArgoCD 설치 (GitOps)"
 	@echo "----------------------------------------------"
@@ -984,6 +988,28 @@ kind-dev-setup: ## 🔧 개발 환경: 클러스터 생성 → ECR 이미지 사
 	@echo "    git push (service-deploy-dev) → GitHub Actions → ECR → ArgoCD 자동 배포"
 	@echo ""
 	@echo "=============================================="
+	@# 배포 정보 자동 설정
+	@echo ""
+	@echo "📝 배포 정보 설정 중..."
+	@if kubectl get namespace wealist-dev >/dev/null 2>&1; then \
+		GIT_USER=$$(git config --get user.name 2>/dev/null || echo "unknown"); \
+		GIT_EMAIL=$$(git config --get user.email 2>/dev/null || echo "unknown"); \
+		GIT_REPO=$$(git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||' | sed 's|\.git$$||' || echo "unknown"); \
+		GIT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"); \
+		GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
+		DEPLOY_TIME=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+		kubectl annotate namespace wealist-dev \
+			"wealist.io/git-repo=$$GIT_REPO" \
+			"wealist.io/git-branch=$$GIT_BRANCH" \
+			"wealist.io/git-commit=$$GIT_COMMIT" \
+			"wealist.io/deployed-by=$$GIT_USER" \
+			"wealist.io/deployed-by-email=$$GIT_EMAIL" \
+			"wealist.io/deploy-time=$$DEPLOY_TIME" \
+			--overwrite >/dev/null 2>&1 && \
+		echo "✅ 배포 정보 설정 완료 (make kind-info ENV=dev 로 확인)"; \
+	fi
+
+# NOTE: kind-staging-setup은 makefiles/argo.mk에 정의됨
 
 # =============================================================================
 # 개별 설정 명령어

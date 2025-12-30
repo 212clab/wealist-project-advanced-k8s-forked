@@ -154,16 +154,16 @@ else
 fi
 echo ""
 
-# ============================================
-# 9. GitHub 저장소 인증 정보 수집
-# ============================================
-echo -e "${YELLOW}🔗 Step 9: Collecting GitHub repository credentials...${NC}"
-echo ""
-read -p "Enter your GitHub username: " GITHUB_USERNAME
-echo -n "Enter your GitHub Personal Access Token (with repo permissions): "
-read -s GITHUB_TOKEN
-echo ""
-echo ""
+# # ============================================
+# # 9. GitHub 저장소 인증 정보 수집
+# # ============================================
+# echo -e "${YELLOW}🔗 Step 9: Collecting GitHub repository credentials...${NC}"
+# echo ""
+# read -p "Enter your GitHub username: " GITHUB_USERNAME
+# echo -n "Enter your GitHub Personal Access Token (with repo permissions): "
+# read -s GITHUB_TOKEN
+# echo ""
+# echo ""
 
 # 입력값 검증
 if [ -z "$GITHUB_USERNAME" ] || [ -z "$GITHUB_TOKEN" ]; then
@@ -221,23 +221,23 @@ else
 fi
 echo ""
 
-# ============================================
-# 11. GitHub 저장소 인증
-# ============================================
-echo -e "${YELLOW}🔗 Step 11: Setting up GitHub repository access...${NC}"
+# # ============================================
+# # 11. GitHub 저장소 인증
+# # ============================================
+# echo -e "${YELLOW}🔗 Step 11: Setting up GitHub repository access...${NC}"
 
-kubectl create secret generic wealist-repo -n argocd \
-  --from-literal=type=git \
-  --from-literal=url=$REPO_URL \
-  --from-literal=username=$GITHUB_USERNAME \
-  --from-literal=password=$GITHUB_TOKEN \
-  --dry-run=client -o yaml | kubectl apply -f -
+# kubectl create secret generic wealist-repo -n argocd \
+#   --from-literal=type=git \
+#   --from-literal=url=$REPO_URL \
+#   --from-literal=username=$GITHUB_USERNAME \
+#   --from-literal=password=$GITHUB_TOKEN \
+#   --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl label secret wealist-repo -n argocd \
-  argocd.argoproj.io/secret-type=repository --overwrite
+# kubectl label secret wealist-repo -n argocd \
+#   argocd.argoproj.io/secret-type=repository --overwrite
 
-echo -e "${GREEN}✅ Repository configured${NC}"
-echo ""
+# echo -e "${GREEN}✅ Repository configured${NC}"
+# echo ""
 
 # ============================================
 # 12. ArgoCD 추가 대기

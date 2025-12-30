@@ -6,8 +6,16 @@
 # 신규: JWT, Internal API Key, OAuth2, LiveKit, DB/Redis Endpoints
 
 # -----------------------------------------------------------------------------
-# Database Endpoint (RDS 호스트 주소)
+# Database Credentials (RDS 호스트 + 비밀번호)
 # -----------------------------------------------------------------------------
+# RDS manage_master_user_password가 생성하는 동적 시크릿(rds!db-xxxx)을
+# 고정 경로로 복사하여 ExternalSecret에서 참조 가능하도록 함
+
+# RDS가 생성한 동적 시크릿에서 비밀번호 읽기
+data "aws_secretsmanager_secret_version" "rds_password" {
+  secret_id = module.rds.db_instance_master_user_secret_arn
+}
+
 resource "aws_secretsmanager_secret" "database_endpoint" {
   name       = "wealist/prod/database/endpoint"
   kms_key_id = module.kms.key_arn
@@ -18,7 +26,9 @@ resource "aws_secretsmanager_secret" "database_endpoint" {
 resource "aws_secretsmanager_secret_version" "database_endpoint" {
   secret_id = aws_secretsmanager_secret.database_endpoint.id
   secret_string = jsonencode({
-    host = module.rds.db_instance_address
+    host     = module.rds.db_instance_address
+    username = jsondecode(data.aws_secretsmanager_secret_version.rds_password.secret_string)["username"]
+    password = jsondecode(data.aws_secretsmanager_secret_version.rds_password.secret_string)["password"]
   })
 }
 
@@ -133,4 +143,60 @@ resource "aws_secretsmanager_secret_version" "livekit" {
   lifecycle {
     ignore_changes = [secret_string]
   }
+}
+
+# -----------------------------------------------------------------------------
+# Discord Webhook URL (수동 입력 - placeholder)
+# -----------------------------------------------------------------------------
+# Discord 서버 설정에서 생성한 Webhook URL
+# ArgoCD Notifications에서 배포 알림 전송에 사용
+# Terraform apply 후 수동으로 실제 값 입력 필요:
+# aws secretsmanager put-secret-value \
+#   --secret-id wealist/prod/notifications/discord \
+#   --secret-string '{"webhook_url":"https://discord.com/api/webhooks/..."}'
+resource "aws_secretsmanager_secret" "discord_webhook" {
+  name       = "wealist/prod/notifications/discord"
+  kms_key_id = module.kms.key_arn
+
+  tags = merge(
+    local.common_tags,
+    {
+      Purpose = "ArgoCD Notifications"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "discord_webhook" {
+  secret_id = aws_secretsmanager_secret.discord_webhook.id
+  secret_string = jsonencode({
+    webhook_url = "https://discord.com/api/webhooks/PLACEHOLDER/PLACEHOLDER-UPDATE-ME"
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string] # 수동 업데이트 후 덮어쓰지 않음
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Grafana Admin Password (자동 생성)
+# -----------------------------------------------------------------------------
+# Grafana 대시보드 관리자 비밀번호
+resource "random_password" "grafana_admin" {
+  length  = 24
+  special = true
+}
+
+resource "aws_secretsmanager_secret" "grafana_admin" {
+  name       = "wealist/prod/monitoring/grafana"
+  kms_key_id = module.kms.key_arn
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "grafana_admin" {
+  secret_id = aws_secretsmanager_secret.grafana_admin.id
+  secret_string = jsonencode({
+    admin_user     = "admin"
+    admin_password = random_password.grafana_admin.result
+  })
 }

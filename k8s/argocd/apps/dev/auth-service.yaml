@@ -23,6 +23,14 @@ spec:
           value: "auth-service"
         - name: image.tag
           value: "dev-latest"
+        - name: imagePullSecrets[0].name
+          value: "ecr-secret"
+        - name: shared.config.DB_HOST
+          value: "172.17.0.1"
+        - name: shared.config.POSTGRES_HOST
+          value: "172.17.0.1"
+        - name: shared.config.REDIS_HOST
+          value: "172.17.0.1"
   destination:
     server: https://kubernetes.default.svc
     namespace: wealist-dev

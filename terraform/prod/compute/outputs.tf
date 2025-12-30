@@ -116,6 +116,14 @@ output "summary" {
       - spot: ${var.spot_desired_size} nodes (min: ${var.spot_min_size}, max: ${var.spot_max_size})
         Instance Types: ${join(", ", var.spot_instance_types)}
 
+    Scheduled Scaling: ${var.scheduled_scaling_enabled ? "ENABLED" : "DISABLED"}
+      평일 (월-금):
+        - Scale Down: ${var.weekday_scale_down_schedule} (UTC) → 새벽 01:00 KST
+        - Scale Up:   ${var.weekday_scale_up_schedule} (UTC) → 오전 08:00 KST
+      주말 (토-일): ${var.weekend_enabled ? "ENABLED" : "DISABLED"}
+        - Scale Down: ${var.weekend_scale_down_schedule} (UTC) → 새벽 03:00 KST
+        - Scale Up:   ${var.weekend_scale_up_schedule} (UTC) → 오전 09:00 KST
+
     Add-ons:
       - vpc-cni (Istio Ambient 지원)
       - coredns
@@ -144,4 +152,95 @@ output "summary" {
     # 3. ArgoCD 설치 및 앱 배포
 
   EOT
+}
+
+# =============================================================================
+# EKS Access - IAM Groups and Roles
+# =============================================================================
+output "eks_iam_groups" {
+  description = "IAM Groups for EKS access - add team members via AWS Console"
+  value = {
+    admin     = aws_iam_group.eks_admin.name
+    developer = aws_iam_group.eks_developer.name
+    readonly  = aws_iam_group.eks_readonly.name
+  }
+}
+
+output "eks_admin_role_arn" {
+  description = "EKS Admin role ARN for cluster administrators"
+  value       = aws_iam_role.eks_admin.arn
+}
+
+output "eks_developer_role_arn" {
+  description = "EKS Developer role ARN for backend developers"
+  value       = aws_iam_role.eks_developer.arn
+}
+
+output "eks_readonly_role_arn" {
+  description = "EKS ReadOnly role ARN for view-only access"
+  value       = aws_iam_role.eks_readonly.arn
+}
+
+output "eks_access_commands" {
+  description = "kubectl configuration commands for each access level"
+  value = {
+    admin     = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region} --role-arn ${aws_iam_role.eks_admin.arn}"
+    developer = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region} --role-arn ${aws_iam_role.eks_developer.arn}"
+    readonly  = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region} --role-arn ${aws_iam_role.eks_readonly.arn}"
+  }
+}
+
+output "eks_access_setup_guide" {
+  description = "Guide for setting up team member access"
+  value       = <<-EOT
+
+    # =============================================================================
+    # EKS 팀원 접근 설정 가이드
+    # =============================================================================
+
+    ## 1. AWS Console에서 팀원을 IAM Group에 추가
+
+    IAM → User groups → 해당 그룹 선택 → Add users
+
+    Groups:
+      - ${aws_iam_group.eks_admin.name}     : 전체 클러스터 관리
+      - ${aws_iam_group.eks_developer.name} : wealist-prod, argocd 네임스페이스
+      - ${aws_iam_group.eks_readonly.name}  : 조회만 가능
+
+    ## 2. 팀원 PC 설정 (Access Key 필요)
+
+    # AWS CLI 설정
+    aws configure
+
+    # kubeconfig 설정 (역할별 명령어)
+    # Admin:
+    ${aws_iam_role.eks_admin.arn}
+
+    # Developer:
+    ${aws_iam_role.eks_developer.arn}
+
+    # ReadOnly:
+    ${aws_iam_role.eks_readonly.arn}
+
+  EOT
+}
+
+# =============================================================================
+# Scheduled Scaling Outputs
+# =============================================================================
+output "scheduled_scaling" {
+  description = "Scheduled scaling configuration for cost optimization"
+  value = {
+    enabled = var.scheduled_scaling_enabled
+    weekday = {
+      scale_down = var.weekday_scale_down_schedule  # 01:00 KST
+      scale_up   = var.weekday_scale_up_schedule    # 08:00 KST
+    }
+    weekend = {
+      enabled    = var.weekend_enabled
+      scale_down = var.weekend_scale_down_schedule  # 03:00 KST
+      scale_up   = var.weekend_scale_up_schedule    # 09:00 KST
+    }
+    info = var.scheduled_scaling_enabled ? "평일: 01:00-08:00 OFF, 주말: 03:00-09:00 OFF" : "24시간 운영 중"
+  }
 }
