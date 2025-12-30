@@ -278,10 +278,15 @@ create_databases() {
         # Grant privileges
         run_psql -c "GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;"
 
-        # Grant schema privileges
+        # Grant schema privileges (PostgreSQL 15+ requires explicit schema ownership)
+        run_psql -d "$db_name" -c "ALTER SCHEMA public OWNER TO $db_user;" 2>/dev/null || true
         run_psql -d "$db_name" -c "GRANT ALL ON SCHEMA public TO $db_user;"
+        run_psql -d "$db_name" -c "GRANT CREATE ON SCHEMA public TO $db_user;"
+        run_psql -d "$db_name" -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $db_user;"
+        run_psql -d "$db_name" -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $db_user;"
         run_psql -d "$db_name" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $db_user;"
         run_psql -d "$db_name" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $db_user;"
+        log_info "Granted full privileges on $db_name to $db_user"
     done
 }
 
