@@ -45,10 +45,12 @@ securityContext:
   readOnlyRootFilesystem: false
 
 # -----------------------------------------------------------------------------
-# External Secrets (Disabled - script creates secret directly)
+# External Secrets Operator (ESO)
 # -----------------------------------------------------------------------------
+# ESO가 AWS Secrets Manager에서 wealist-shared-secret을 자동 생성
+# Helm chart에서 secret 생성을 건너뜀
 externalSecrets:
-  enabled: true  # Helm skips secret creation, setup script handles it
+  enabled: true
 
 # -----------------------------------------------------------------------------
 # Features

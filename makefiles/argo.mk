@@ -601,22 +601,33 @@ eso-install: ## [ESO] External Secrets Operator 설치
 eso-setup-aws: ## [ESO] AWS 자격증명 Secret 생성 (ESO가 AWS Secrets Manager 접근용)
 	@echo -e "$(YELLOW)🔐 AWS 자격증명 설정 중...$(NC)"
 	@echo ""
-	@if [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then \
-		echo "환경변수 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY가 필요합니다."; \
+	@ACCESS_KEY="$$AWS_ACCESS_KEY_ID"; \
+	SECRET_KEY="$$AWS_SECRET_ACCESS_KEY"; \
+	if [ -z "$$ACCESS_KEY" ] || [ -z "$$SECRET_KEY" ]; then \
+		ACCESS_KEY=$$(aws configure get aws_access_key_id 2>/dev/null || echo ""); \
+		SECRET_KEY=$$(aws configure get aws_secret_access_key 2>/dev/null || echo ""); \
+	fi; \
+	if [ -z "$$ACCESS_KEY" ] || [ -z "$$SECRET_KEY" ]; then \
+		echo "AWS 자격증명을 입력하세요:"; \
 		echo ""; \
-		echo "설정 방법:"; \
-		echo "  export AWS_ACCESS_KEY_ID=<your-access-key>"; \
-		echo "  export AWS_SECRET_ACCESS_KEY=<your-secret-key>"; \
+		printf "AWS Access Key ID: "; \
+		read ACCESS_KEY; \
+		printf "AWS Secret Access Key: "; \
+		read -s SECRET_KEY; \
 		echo ""; \
+	fi; \
+	if [ -z "$$ACCESS_KEY" ] || [ -z "$$SECRET_KEY" ]; then \
+		echo ""; \
+		echo -e "$(RED)❌ AWS 자격증명이 입력되지 않았습니다$(NC)"; \
 		exit 1; \
-	fi
-	@kubectl create namespace external-secrets 2>/dev/null || true
-	@kubectl delete secret aws-credentials -n external-secrets 2>/dev/null || true
-	@kubectl create secret generic aws-credentials \
-		--from-literal=access-key="$$AWS_ACCESS_KEY_ID" \
-		--from-literal=secret-access-key="$$AWS_SECRET_ACCESS_KEY" \
-		-n external-secrets
-	@echo -e "$(GREEN)✅ AWS 자격증명 Secret 생성 완료$(NC)"
+	fi; \
+	kubectl create namespace external-secrets 2>/dev/null || true; \
+	kubectl delete secret aws-credentials -n external-secrets 2>/dev/null || true; \
+	kubectl create secret generic aws-credentials \
+		--from-literal=access-key="$$ACCESS_KEY" \
+		--from-literal=secret-access-key="$$SECRET_KEY" \
+		-n external-secrets; \
+	echo -e "$(GREEN)✅ AWS 자격증명 Secret 생성 완료$(NC)"
 
 eso-apply-staging: ## [ESO] Staging용 ClusterSecretStore + ExternalSecret 적용
 	@echo -e "$(YELLOW)🔐 ESO Staging 설정 적용 중...$(NC)"

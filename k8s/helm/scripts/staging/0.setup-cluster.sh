@@ -245,33 +245,39 @@ echo "✅ External Secrets Operator 설치 완료"
 # 8-2. AWS 자격증명 Secret 생성 (ESO가 AWS Secrets Manager 접근용)
 echo "🔐 AWS 자격증명 Secret 생성 중..."
 
-# AWS 자격증명 가져오기 (환경변수 또는 AWS CLI에서)
+# AWS 자격증명 가져오기 (환경변수 → AWS CLI → CLI 입력 순서)
 AWS_ACCESS_KEY="${AWS_ACCESS_KEY_ID:-}"
 AWS_SECRET_KEY="${AWS_SECRET_ACCESS_KEY:-}"
 
 # 환경변수 없으면 AWS CLI 설정에서 가져오기
 if [ -z "$AWS_ACCESS_KEY" ] || [ -z "$AWS_SECRET_KEY" ]; then
     echo "  → 환경변수에서 AWS 자격증명을 찾을 수 없어 AWS CLI에서 가져옵니다..."
-    # AWS 프로필에서 자격증명 추출 시도
     AWS_ACCESS_KEY=$(aws configure get aws_access_key_id 2>/dev/null || echo "")
     AWS_SECRET_KEY=$(aws configure get aws_secret_access_key 2>/dev/null || echo "")
 fi
 
+# 여전히 없으면 CLI로 입력받기
 if [ -z "$AWS_ACCESS_KEY" ] || [ -z "$AWS_SECRET_KEY" ]; then
-    echo "⚠️  AWS 자격증명을 찾을 수 없습니다."
     echo ""
-    echo "   ESO를 사용하려면 다음 중 하나를 실행하세요:"
+    echo "  AWS 자격증명이 필요합니다. (ESO가 AWS Secrets Manager 접근용)"
+    echo "  AWS Access Key와 Secret Key를 입력하세요."
+    echo "  (건너뛰려면 Enter를 누르세요)"
     echo ""
-    echo "   1. 환경변수 설정 후 다시 실행:"
-    echo "      export AWS_ACCESS_KEY_ID=<your-access-key>"
-    echo "      export AWS_SECRET_ACCESS_KEY=<your-secret-key>"
+    read -p "  AWS Access Key ID: " AWS_ACCESS_KEY
+    if [ -n "$AWS_ACCESS_KEY" ]; then
+        read -sp "  AWS Secret Access Key: " AWS_SECRET_KEY
+        echo ""
+    fi
+fi
+
+if [ -z "$AWS_ACCESS_KEY" ] || [ -z "$AWS_SECRET_KEY" ]; then
     echo ""
-    echo "   2. 수동으로 Secret 생성:"
-    echo "      kubectl create secret generic aws-credentials -n external-secrets \\"
-    echo "        --from-literal=access-key=<your-access-key> \\"
-    echo "        --from-literal=secret-access-key=<your-secret-key>"
+    echo "⚠️  AWS 자격증명이 설정되지 않았습니다."
+    echo "   ESO 없이 진행합니다. 나중에 다음 명령어로 설정할 수 있습니다:"
     echo ""
-    echo "   ESO 없이 진행합니다. (wealist-shared-secret은 ArgoCD가 생성)"
+    echo "   make eso-setup-aws"
+    echo "   make eso-apply-staging"
+    echo ""
 else
     # AWS 자격증명 Secret 생성
     kubectl delete secret aws-credentials -n external-secrets 2>/dev/null || true
