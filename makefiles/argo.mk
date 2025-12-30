@@ -167,9 +167,14 @@ argo-install-simple: ## ArgoCD만 간단 설치 (Sealed Secrets 없이)
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "WARNING: ArgoCD server not ready yet"
 	@echo ""
 	@echo "ArgoCD sub-path 설정 중 (/api/argo)..."
-	@kubectl patch configmap argocd-cm -n argocd --type merge -p '{"data":{"server.rootpath":"/api/argo","server.insecure":"true"}}' 2>/dev/null || \
-		kubectl create configmap argocd-cm -n argocd --from-literal=server.rootpath=/api/argo --from-literal=server.insecure=true 2>/dev/null || true
+	@# ArgoCD 2.0+: argocd-cmd-params-cm에서 server 설정 관리
+	@kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge \
+		-p '{"data":{"server.insecure":"true","server.rootpath":"/api/argo","server.basehref":"/api/argo"}}' 2>/dev/null || true
+	@# 기존 argocd-cm도 설정 (호환성)
+	@kubectl patch configmap argocd-cm -n argocd --type merge \
+		-p '{"data":{"server.rootpath":"/api/argo","server.insecure":"true"}}' 2>/dev/null || true
 	@kubectl rollout restart deployment argocd-server -n argocd 2>/dev/null || true
+	@kubectl rollout status deployment argocd-server -n argocd --timeout=120s 2>/dev/null || true
 	@echo ""
 	@echo "ReferenceGrant 적용 중 (cross-namespace routing)..."
 	@kubectl apply -f k8s/argocd/base/referencegrant-argocd.yaml 2>/dev/null || true
