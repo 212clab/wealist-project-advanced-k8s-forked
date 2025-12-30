@@ -23,27 +23,27 @@ argo-help: ## [ArgoCD] 도움말 표시
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "빠른 시작:"
-	@echo "  make all              - 클러스터 생성부터 배포까지 전체 프로세스"
+	@echo "  make kind-staging-setup  - Staging 환경 전체 설정"
 	@echo ""
 	@echo "단계별 실행:"
-	@echo "  make cluster-up       - Kind 클러스터 생성"
-	@echo "  make bootstrap        - ArgoCD & Sealed Secrets 설치"
-	@echo "  make deploy           - Applications 배포"
+	@echo "  make cluster-up          - Kind 클러스터 생성"
+	@echo "  make argo-install-simple - ArgoCD 설치"
+	@echo "  make argo-deploy-staging - Applications 배포"
 	@echo ""
 	@echo "관리:"
-	@echo "  make status           - 전체 상태 확인"
+	@echo "  make argo-status      - 전체 상태 확인"
 	@echo "  make logs             - ArgoCD 로그 확인"
 	@echo "  make ui               - ArgoCD UI 열기"
-	@echo "  make clean            - 모든 리소스 삭제"
+	@echo "  make argo-clean       - 모든 리소스 삭제"
 	@echo "  make cluster-down     - 클러스터 삭제"
 	@echo ""
-	@echo "시크릿 관리:"
-	@echo "  make seal-secrets     - Secrets 재암호화"
-	@echo "  make backup-keys      - Sealed Secrets 키 백업"
+	@echo "ESO (External Secrets):"
+	@echo "  make eso-status       - ESO 상태 확인"
+	@echo "  make eso-sync         - Secret 강제 동기화"
+	@echo "  make verify-secrets   - Secret 확인"
 	@echo ""
 	@echo "변수:"
 	@echo "  ENVIRONMENT=$(ENVIRONMENT)"
-	@echo "  SEALED_SECRETS_KEY=$(SEALED_SECRETS_KEY)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 argo-setup: ## ArgoCD 설치 (인터랙티브)
@@ -272,12 +272,10 @@ argo-deploy-prod: ## [ArgoCD] Prod 환경 Applications 배포
 
 # argo-status 각 항목 설명:
 # - ArgoCD Pods: ArgoCD 시스템 컴포넌트 (server, repo-server, redis, controller 등)
-# - Sealed Secrets Controller: Git에 암호화된 Secret 저장 가능하게 해주는 Bitnami 프로젝트 컨트롤러
+# - ESO: External Secrets Operator - AWS Secrets Manager에서 시크릿 동기화
 # - Applications: ArgoCD Application CRD 개수 (Git에서 읽어 배포할 앱 정의)
 #   - Synced = Git과 클러스터 상태 일치
 #   - OutOfSync = Git과 클러스터 상태 불일치 (sync 필요)
-# - SealedSecrets: 암호화된 Secret CRD (kubeseal로 암호화 → Git 커밋 가능)
-# - Secrets: 일반 K8s Secret (base64 인코딩만, 암호화 X, Git 저장 비권장)
 argo-status: ## [ArgoCD] 전체 상태 확인
 	@echo -e "$(YELLOW)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo -e "$(YELLOW)📊 시스템 상태$(NC)"
@@ -286,20 +284,19 @@ argo-status: ## [ArgoCD] 전체 상태 확인
 	@echo "🏗️  클러스터:"
 	@kubectl cluster-info | head -1 || echo "클러스터 없음"
 	@echo ""
-	@echo "📦 ArgoCD Pods: (ArgoCD 시스템 컴포넌트)"
+	@echo "📦 ArgoCD Pods:"
 	@kubectl get pods -n argocd --no-headers 2>/dev/null | grep -E "Running|Ready" | wc -l | xargs -I {} echo "  Running: {} pods"
 	@echo ""
-	@echo "🔐 Sealed Secrets: (암호화 Secret용 컨트롤러)"
-	@kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets --no-headers 2>/dev/null | wc -l | xargs -I {} echo "  Controller: {} pod(s)"
+	@echo "🔐 ESO (External Secrets Operator):"
+	@kubectl get pods -n external-secrets --no-headers 2>/dev/null | grep -E "Running" | wc -l | xargs -I {} echo "  Running: {} pods"
+	@kubectl get externalsecret -n wealist-$(ENVIRONMENT) --no-headers 2>/dev/null | wc -l | xargs -I {} echo "  ExternalSecrets: {}"
+	@kubectl get externalsecret -n wealist-$(ENVIRONMENT) --no-headers 2>/dev/null | grep -i "SecretSynced" | wc -l | xargs -I {} echo "  Synced: {}"
 	@echo ""
-	@echo "🎯 Applications: (ArgoCD가 관리하는 앱)"
+	@echo "🎯 Applications:"
 	@kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l | xargs -I {} echo "  Total: {}"
-	@kubectl get applications -n argocd --no-headers 2>/dev/null | grep Synced | wc -l | xargs -I {} echo "  Synced: {} (Git 동기화 완료)"
+	@kubectl get applications -n argocd --no-headers 2>/dev/null | grep Synced | wc -l | xargs -I {} echo "  Synced: {}"
 	@echo ""
-	@echo "🔒 SealedSecrets: (암호화된 Secret, Git 저장 가능)"
-	@kubectl get sealedsecrets -n wealist-$(ENVIRONMENT) --no-headers 2>/dev/null | wc -l | xargs -I {} echo "  Total: {}"
-	@echo ""
-	@echo "🗝️  Secrets: (일반 Secret, 암호화 안됨)"
+	@echo "🗝️  Secrets (wealist-$(ENVIRONMENT)):"
 	@kubectl get secrets -n wealist-$(ENVIRONMENT) --no-headers 2>/dev/null | wc -l | xargs -I {} echo "  Total: {}"
 	@echo ""
 	@echo -e "$(YELLOW)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
@@ -308,14 +305,14 @@ status-detail: ## 상세 상태 확인
 	@echo "📦 ArgoCD Pods:"
 	@kubectl get pods -n argocd
 	@echo ""
-	@echo "🔐 Sealed Secrets:"
-	@kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets
+	@echo "🔐 ESO Pods:"
+	@kubectl get pods -n external-secrets
 	@echo ""
 	@echo "🎯 Applications:"
 	@kubectl get applications -n argocd
 	@echo ""
-	@echo "🔒 SealedSecrets:"
-	@kubectl get sealedsecrets -A
+	@echo "🔒 ExternalSecrets:"
+	@kubectl get externalsecrets -A
 	@echo ""
 	@echo "🗝️  Secrets:"
 	@kubectl get secrets -n wealist-$(ENVIRONMENT)
@@ -340,26 +337,9 @@ logs: ## ArgoCD 로그 확인
 	@echo "ArgoCD Application Controller 로그:"
 	@kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller --tail=50
 
-logs-sealed: ## Sealed Secrets Controller 로그
-	@echo "Sealed Secrets Controller 로그:"
-	@kubectl logs -n kube-system -l app.kubernetes.io/name=sealed-secrets --tail=50
-
-# ============================================
-# Secrets 관리
-# ============================================
-
-seal-secrets: ## Secrets 재암호화
-	@echo -e "$(YELLOW)🔐 Secrets 재암호화...$(NC)"
-	@chmod +x k8s/argocd/scripts/re-seal-secrets-complete.sh
-	@./k8s/argocd/scripts/re-seal-secrets-complete.sh $(ENVIRONMENT)
-
-backup-keys: ## Sealed Secrets 키 백업
-	@echo -e "$(YELLOW)💾 키 백업 중...$(NC)"
-	@BACKUP_FILE="sealed-secrets-$(ENVIRONMENT)-$$(date +%Y%m%d-%H%M%S).key"; \
-	kubectl get secret -n kube-system -l sealedsecrets.bitnami.com/sealed-secrets-key -o yaml > $$BACKUP_FILE; \
-	echo -e "$(GREEN)✅ 키 백업 완료: $$BACKUP_FILE$(NC)"; \
-	echo ""; \
-	echo -e "$(RED)⚠️  이 파일을 안전한 곳에 보관하세요!$(NC)"
+logs-eso: ## ESO Controller 로그
+	@echo "ESO Controller 로그:"
+	@kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --tail=50
 
 # ============================================
 # 정리
@@ -383,10 +363,10 @@ restart-argocd: ## ArgoCD 재시작
 	@kubectl rollout restart deployment -n argocd
 	@kubectl rollout status deployment -n argocd
 
-restart-sealed: ## Sealed Secrets Controller 재시작
-	@echo -e "$(YELLOW)🔄 Sealed Secrets Controller 재시작...$(NC)"
-	@kubectl delete pod -n kube-system -l app.kubernetes.io/name=sealed-secrets
-	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=sealed-secrets -n kube-system --timeout=300s
+restart-eso: ## ESO Controller 재시작
+	@echo -e "$(YELLOW)🔄 ESO Controller 재시작...$(NC)"
+	@kubectl rollout restart deployment -n external-secrets
+	@kubectl rollout status deployment -n external-secrets --timeout=120s
 	@echo -e "$(GREEN)✅ 재시작 완료$(NC)"
 
 sync-all: ## 모든 Applications Sync
@@ -415,31 +395,31 @@ debug: ## 디버깅 정보 출력
 	@echo "ArgoCD Applications:"
 	@kubectl get applications -n argocd
 	@echo ""
-	@echo "SealedSecrets 상태:"
-	@kubectl get sealedsecrets -A
+	@echo "ExternalSecrets 상태:"
+	@kubectl get externalsecrets -A
 	@echo ""
-	@echo "Sealed Secrets Controller 로그 (last 20):"
-	@kubectl logs -n kube-system -l app.kubernetes.io/name=sealed-secrets --tail=20
+	@echo "ESO Controller 로그 (last 20):"
+	@kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --tail=20 2>/dev/null || echo "ESO 미설치"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-verify-secrets: ## Secrets 복호화 확인
+verify-secrets: ## Secrets 확인 (ESO 동기화 상태)
 	@echo -e "$(YELLOW)🔐 Secrets 확인...$(NC)"
 	@echo ""
-	@echo "SealedSecrets:"
-	@kubectl get sealedsecrets -n wealist-$(ENVIRONMENT)
+	@echo "ExternalSecrets:"
+	@kubectl get externalsecrets -n wealist-$(ENVIRONMENT)
 	@echo ""
 	@echo "Secrets:"
 	@kubectl get secrets -n wealist-$(ENVIRONMENT)
 	@echo ""
 	@if kubectl get secret wealist-shared-secret -n wealist-$(ENVIRONMENT) &> /dev/null; then \
 		echo -e "$(GREEN)✅ wealist-shared-secret 존재$(NC)"; \
-		kubectl describe secret wealist-shared-secret -n wealist-$(ENVIRONMENT) | grep -A 10 "Data:"; \
+		kubectl describe secret wealist-shared-secret -n wealist-$(ENVIRONMENT) | grep -A 20 "Data:"; \
 	else \
 		echo -e "$(RED)❌ wealist-shared-secret 없음$(NC)"; \
 		echo ""; \
-		echo "SealedSecret 상태:"; \
-		kubectl describe sealedsecret wealist-shared-secret -n wealist-$(ENVIRONMENT) 2>/dev/null || echo "SealedSecret도 없음"; \
+		echo "ExternalSecret 상태:"; \
+		kubectl describe externalsecret wealist-shared-secret -n wealist-$(ENVIRONMENT) 2>/dev/null || echo "ExternalSecret도 없음"; \
 	fi
 # ... (기존 내용 유지) ...
 
