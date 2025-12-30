@@ -242,6 +242,13 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
     --wait --timeout 5m
 echo "✅ External Secrets Operator 설치 완료"
 
+# CRD가 준비될 때까지 대기
+echo "⏳ ESO CRDs 준비 대기 중..."
+sleep 5
+kubectl wait --for=condition=established --timeout=60s crd/clustersecretstores.external-secrets.io 2>/dev/null || true
+kubectl wait --for=condition=established --timeout=60s crd/externalsecrets.external-secrets.io 2>/dev/null || true
+echo "✅ ESO CRDs 준비 완료"
+
 # 8-2. AWS 자격증명 Secret 생성 (ESO가 AWS Secrets Manager 접근용)
 echo "🔐 AWS 자격증명 Secret 생성 중..."
 
