@@ -45,6 +45,12 @@ securityContext:
   readOnlyRootFilesystem: false
 
 # -----------------------------------------------------------------------------
+# External Secrets (Disabled - script creates secret directly)
+# -----------------------------------------------------------------------------
+externalSecrets:
+  enabled: true  # Helm skips secret creation, setup script handles it
+
+# -----------------------------------------------------------------------------
 # Features
 # -----------------------------------------------------------------------------
 autoscaling:
