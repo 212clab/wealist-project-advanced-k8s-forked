@@ -9,7 +9,7 @@ spec:
   project: wealist-staging
   source:
     repoURL: https://github.com/212clab/wealist-project-advanced-k8s-forked.git
-    targetRevision: claude/argocd-auto-deploy-dev-tWRSt
+    targetRevision: argo-develop
     path: k8s/helm/charts/wealist-monitoring
     helm:
       valueFiles:
