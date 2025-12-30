@@ -3,14 +3,16 @@ kind: Application
 metadata:
   name: kyverno-policies
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
-    repoURL: https://github.com/OrangesCloud/wealist-project-advanced-k8s
+    repoURL: https://github.com/OrangesCloud/wealist-policies
     targetRevision: HEAD
-    path: security/policies
+    path: prod
     directory:
-      recurse: true #
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
