@@ -457,6 +457,18 @@ kind-staging-setup: ## [ArgoCD] Kind 클러스터 + ECR + ArgoCD + 앱 배포 (s
 	fi
 	@echo -e "$(GREEN)✅ Kind 클러스터 (staging) 준비 완료$(NC)"
 	@echo ""
+	@echo -e "$(YELLOW)🐘 Host PostgreSQL 초기화 (staging)...$(NC)"
+	@if [ -f "scripts/init-local-postgres.sh" ]; then \
+		chmod +x scripts/init-local-postgres.sh; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			STAGING_DB_PASSWORD=$${STAGING_DB_PASSWORD:-wealist-staging-password} ./scripts/init-local-postgres.sh staging; \
+		else \
+			sudo STAGING_DB_PASSWORD=$${STAGING_DB_PASSWORD:-wealist-staging-password} ./scripts/init-local-postgres.sh staging; \
+		fi; \
+	else \
+		echo -e "$(YELLOW)⚠️  init-local-postgres.sh not found, skipping DB init$(NC)"; \
+	fi
+	@echo ""
 	@echo -e "$(YELLOW)🚀 ArgoCD 설치 중...$(NC)"
 	$(MAKE) argo-install-simple
 	@echo ""

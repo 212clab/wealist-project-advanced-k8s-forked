@@ -52,7 +52,14 @@ is_wsl() {
 # Database configurations
 # Format: db_name:user:password
 # Note: Using 'postgres' as password to match Helm values.yaml configuration
-DATABASES=(
+
+# Mode: dev (default) or staging
+# - dev: 개별 서비스 유저 (board_service, user_service 등)
+# - staging: 단일 wealist 유저 (ESO와 동일)
+MODE="${1:-dev}"
+
+# DEV mode: 개별 서비스별 DB/유저
+DATABASES_DEV=(
     "wealist_user_service_db:user_service:postgres"
     "wealist_board_service_db:board_service:postgres"
     "wealist_chat_service_db:chat_service:postgres"
@@ -60,6 +67,23 @@ DATABASES=(
     "wealist_storage_service_db:storage_service:postgres"
     "wealist_video_service_db:video_service:postgres"
 )
+
+# STAGING mode: 단일 wealist 유저 (ESO에서 사용하는 credentials와 동일)
+# 비밀번호는 AWS Secrets Manager의 wealist/staging/database/endpoint와 일치해야 함
+STAGING_USER="wealist"
+STAGING_PASSWORD="${STAGING_DB_PASSWORD:-wealist-staging-password}"
+STAGING_DATABASE="wealist"
+
+# 모드에 따라 DATABASES 배열 설정 (main 함수에서 호출)
+set_databases_for_mode() {
+    if [ "$MODE" = "staging" ]; then
+        DATABASES=("${STAGING_DATABASE}:${STAGING_USER}:${STAGING_PASSWORD}")
+        log_info "Staging 모드: 단일 wealist 유저 생성"
+    else
+        DATABASES=("${DATABASES_DEV[@]}")
+        log_info "Dev 모드: 개별 서비스 유저 생성"
+    fi
+}
 
 # Run psql command (handles macOS vs Linux differences)
 run_psql() {
@@ -391,17 +415,27 @@ print_summary() {
         echo ""
     fi
     echo "Next Steps:"
-    echo "  1. Deploy with: make helm-install-all ENV=dev"
-    echo "  2. For initial tables: make helm-install-all-init ENV=dev"
+    if [ "$MODE" = "staging" ]; then
+        echo "  1. Deploy with: make kind-staging-setup"
+        echo "  2. ArgoCD가 자동으로 서비스 배포"
+        echo ""
+        echo "Note: AWS Secrets Manager의 비밀번호와 일치해야 합니다!"
+        echo "  STAGING_DB_PASSWORD 환경변수로 비밀번호 지정 가능"
+    else
+        echo "  1. Deploy with: make helm-install-all ENV=dev"
+        echo "  2. For initial tables: make helm-install-all-init ENV=dev"
+    fi
     echo ""
 }
 
 # Main execution
 main() {
     log_info "Starting PostgreSQL initialization for Wealist..."
+    log_info "Mode: $MODE"
     echo ""
 
     check_permissions
+    set_databases_for_mode
     configure_pg_hba
     configure_postgresql_conf
     set_postgres_password
