@@ -4,7 +4,7 @@ metadata:
   name: wealist-monitoring-dev
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "12"  # Istio 설정 이후에 설치
+    argocd.argoproj.io/sync-wave: "12" # Istio 설정 이후에 설치
 spec:
   project: wealist-dev
   source:
@@ -15,14 +15,14 @@ spec:
       valueFiles:
         - ../../environments/base.yaml
         - ../../environments/dev.yaml
-        # - ../../environments/dev-secrets.yaml
       parameters:
         - name: global.namespace
           value: wealist-dev
+        # External DB Host (WSL/Kind: 172.17.0.1 Docker bridge gateway)
         - name: postgresExporter.config.host
-          value: postgres
+          value: "172.17.0.1"
         - name: redisExporter.config.host
-          value: redis
+          value: "172.17.0.1"
   destination:
     server: https://kubernetes.default.svc
     namespace: wealist-dev
@@ -32,3 +32,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

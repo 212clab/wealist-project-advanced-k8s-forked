@@ -12,7 +12,7 @@ global:
 # =============================================================================
 # External Secrets (ESO) Configuration
 # =============================================================================
-# enabled: true → ExternalSecret에서 시크릿 가져옴 (staging/prod)
+# enabled: true → ExternalSecret에서 시크릿 가져옴 (dev/prod)
 # enabled: false → values 또는 로컬 Secret 사용 (dev/localhost)
 externalSecrets:
   enabled: false
@@ -286,6 +286,59 @@ redisExporter:
     port: 6379
 
 # =============================================================================
+# kube-state-metrics - Kubernetes Objects State Metrics
+# =============================================================================
+# Generates metrics about Kubernetes objects (pods, nodes, deployments, etc.)
+# Required for Kubernetes Cluster dashboard and Service Health Overview
+kubeStateMetrics:
+  enabled: false  # Enable in prod environment
+
+  image:
+    repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    tag: v2.10.1
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 8080
+
+  telemetryPort: 8081
+
+  # Optional: limit to specific namespaces (empty = all namespaces)
+  namespaces: []
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# =============================================================================
+# node-exporter - Node System Metrics
+# =============================================================================
+# Exports node-level metrics (CPU, memory, disk, network)
+# Required for node resource usage in Kubernetes Cluster dashboard
+nodeExporter:
+  enabled: false  # Enable in prod environment
+
+  image:
+    repository: prom/node-exporter
+    tag: v1.7.0
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 9100
+
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "25m"
+    limits:
+      memory: "64Mi"
+      cpu: "100m"
+
+# =============================================================================
 # ArgoCD Metrics
 # =============================================================================
 argocd:
@@ -299,3 +352,159 @@ shared:
   secrets:
     DB_PASSWORD: ""
     REDIS_PASSWORD: ""
+
+# =============================================================================
+# k6 Performance Testing Configuration
+# =============================================================================
+# k6 성능 테스트를 Kubernetes에서 실행하기 위한 설정
+# 참고: https://grafana.com/docs/k6/latest/
+k6:
+  enabled: false  # Production에서만 true
+
+  image:
+    repository: grafana/k6
+    tag: "0.49.0"
+    pullPolicy: IfNotPresent
+
+  # k6 Job 리소스 제한
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Prometheus Remote Write 설정
+  # k6 실행 시 --out experimental-prometheus-rw 옵션 사용
+  prometheus:
+    remoteWriteUrl: "http://prometheus:9090/api/v1/write"
+
+  # 테스트 시나리오 기본 설정
+  scenarios:
+    load:
+      enabled: true
+      duration: "5m"
+      vus: 20
+      description: "Normal load test"
+    stress:
+      enabled: true
+      maxVUs: 300
+      duration: "30m"
+      description: "Stress test to find breaking point"
+    spike:
+      enabled: true
+      peakVUs: 500
+      duration: "10m"
+      description: "Spike test for sudden traffic bursts"
+
+  # 테스트 대상 서비스 엔드포인트
+  endpoints:
+    baseUrl: "http://istio-ingressgateway.istio-system.svc.cluster.local"
+    services:
+      - name: board
+        path: /svc/board
+        healthPath: /health/live
+      - name: user
+        path: /svc/user
+        healthPath: /health/live
+      - name: chat
+        path: /svc/chat
+        healthPath: /health/live
+      - name: noti
+        path: /svc/noti
+        healthPath: /health/live
+      - name: storage
+        path: /svc/storage
+        healthPath: /health/live
+      - name: video
+        path: /svc/video
+        healthPath: /health/live
+
+  # SLA 임계값 (Alert과 연동)
+  thresholds:
+    latencyP95Ms: 500
+    latencyP99Ms: 1000
+    errorRatePercent: 1
+    availabilityPercent: 99.9
+
+# =============================================================================
+# OpenTelemetry Collector - Trace Collection Gateway
+# =============================================================================
+# OTEL Collector를 Gateway 패턴으로 배포하여 서비스에서 전송된 trace를 수집
+# 2025 트렌드: Hybrid Pattern (DaemonSet for logs via Promtail + Deployment for traces)
+otelCollector:
+  enabled: false  # Enable in local-kind and prod
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.92.0"  # 2025년 최신 안정 버전
+    pullPolicy: IfNotPresent
+
+  replicas: 1  # prod에서 2로 증가
+
+  service:
+    otlpGrpcPort: 4317
+    otlpHttpPort: 4318
+    metricsPort: 8888
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Collector 설정
+  config:
+    # Batch processor 설정
+    batchTimeout: 5s
+    sendBatchSize: 1000
+    # Memory limiter
+    memoryLimitMiB: 400
+    spikeLimitMiB: 100
+
+# =============================================================================
+# Tempo - Distributed Tracing Backend
+# =============================================================================
+# Grafana Tempo를 사용하여 분산 추적 저장 및 쿼리
+# Traces-Logs Correlation을 위해 Loki와 연동
+tempo:
+  enabled: false  # Enable in local-kind and prod
+
+  image:
+    repository: grafana/tempo
+    tag: "2.3.1"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  service:
+    httpPort: 3200      # Query API
+    otlpGrpcPort: 4317  # OTLP gRPC receiver
+    otlpHttpPort: 4318  # OTLP HTTP receiver
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  config:
+    # Trace 보관 기간
+    retentionPeriod: 168h  # 7 days
+    # 로컬 스토리지 백엔드
+    backend: local
+    # S3 백엔드 (prod용)
+    s3:
+      enabled: false
+      bucket: ""
+      region: ""

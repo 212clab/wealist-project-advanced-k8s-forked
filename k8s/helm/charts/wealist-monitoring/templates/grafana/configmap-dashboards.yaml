@@ -9,9 +9,58 @@ metadata:
     app.kubernetes.io/name: grafana
     app.kubernetes.io/component: monitoring
 data:
-  # Load dashboards from dashboards directory
+  # Load dashboards from dashboards directory (legacy)
   {{- $files := .Files }}
   {{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+  {{ base $path }}: |
+{{ $files.Get $path | indent 4 }}
+  {{- end }}
+---
+# =============================================================================
+# Dashboards V2 - Role-based dashboards following 2025 best practices
+# =============================================================================
+# Structure:
+#   landing/     - System overview for all roles (starting point)
+#   developer/   - Developer-focused dashboards (API, latency, debugging)
+#   pm/          - PM/Planner dashboards (business metrics, SLO, usage)
+#   operations/  - Operations/SRE dashboards (incidents, errors, k8s)
+#   shared/      - Shared dashboards referenced by multiple roles
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-v2
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: grafana
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: monitoring
+    grafana_dashboard: "1"
+data:
+  # Placeholder to ensure ConfigMap is always created (even if dashboards-v2 is empty)
+  .gitkeep: ""
+  # Landing dashboards - Entry points for all roles
+  {{- range $path, $_ := .Files.Glob "dashboards-v2/landing/*.json" }}
+  {{ base $path }}: |
+{{ $files.Get $path | indent 4 }}
+  {{- end }}
+  # Developer dashboards - API performance, latency analysis, debugging
+  {{- range $path, $_ := .Files.Glob "dashboards-v2/developer/*.json" }}
+  {{ base $path }}: |
+{{ $files.Get $path | indent 4 }}
+  {{- end }}
+  # PM dashboards - Business metrics, SLO overview, usage analytics
+  {{- range $path, $_ := .Files.Glob "dashboards-v2/pm/*.json" }}
+  {{ base $path }}: |
+{{ $files.Get $path | indent 4 }}
+  {{- end }}
+  # Operations dashboards - Incidents, error budget, K8s cluster, DB/Redis
+  {{- range $path, $_ := .Files.Glob "dashboards-v2/operations/*.json" }}
+  {{ base $path }}: |
+{{ $files.Get $path | indent 4 }}
+  {{- end }}
+  # Shared dashboards - Common dashboards for all roles
+  {{- range $path, $_ := .Files.Glob "dashboards-v2/shared/*.json" }}
   {{ base $path }}: |
 {{ $files.Get $path | indent 4 }}
   {{- end }}
