@@ -320,7 +320,7 @@ jobs:
       - name: Send Discord notification on success
         if: needs.build-and-push.result == 'success'
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_BUILD }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             SERVICES='${{ needs.detect-changes.outputs.services }}'
@@ -377,7 +377,7 @@ jobs:
       - name: Send Discord notification on failure
         if: needs.build-and-push.result == 'failure'
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_BUILD }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             SERVICES='${{ needs.detect-changes.outputs.services }}'
@@ -581,7 +581,7 @@ jobs:
 
       - name: Send Discord notification for GitOps update
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_DEPLOY }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             SERVICES='${{ needs.detect-changes.outputs.services }}'
