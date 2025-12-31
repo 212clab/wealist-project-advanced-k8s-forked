@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.32.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -110,16 +110,18 @@ func InitProvider(ctx context.Context, cfg *Config) (shutdown func(context.Conte
 }
 
 // newResource creates an OpenTelemetry resource with service metadata.
+// Uses resource.NewSchemaless() to avoid Schema URL conflicts entirely.
+// The standard detectors (WithHost, WithOS, etc.) each use their own schema URLs
+// which conflict when merged. Using schemaless resource avoids this issue.
 func newResource(cfg *Config) (*resource.Resource, error) {
-	return resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.ServiceVersion(cfg.ServiceVersion),
-			semconv.DeploymentEnvironmentName(cfg.Environment),
-		),
-	)
+	return resource.NewSchemaless(
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.ServiceVersion),
+		semconv.DeploymentEnvironmentName(cfg.Environment),
+		semconv.TelemetrySDKName("opentelemetry"),
+		semconv.TelemetrySDKLanguageGo,
+		semconv.TelemetrySDKVersion("1.32.0"),
+	), nil
 }
 
 // newPropagator creates a propagator for W3C Trace Context and Baggage.
