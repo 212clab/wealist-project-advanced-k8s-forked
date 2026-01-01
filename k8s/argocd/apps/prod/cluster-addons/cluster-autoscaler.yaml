@@ -21,7 +21,7 @@ spec:
     helm:
       valuesObject:
         autoDiscovery:
-          clusterName: "wealist-prod"
+          clusterName: "wealist-prod-eks"
         awsRegion: "ap-northeast-2"
         rbac:
           serviceAccount:
