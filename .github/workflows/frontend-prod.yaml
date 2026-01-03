@@ -1,0 +1,215 @@
+# =============================================================================
+# Frontend CI/CD - Production Environment (Simplified)
+# =============================================================================
+# 트리거:
+#   - frontend-v* 태그 push (예: frontend-v1.0.0, frontend-v1.0.3)
+#   - 수동 트리거
+#
+# 이 워크플로우가 하는 일:
+#   1. 소스 빌드 (pnpm build)
+#   2. S3에 배포 (버전별 폴더 + 루트)
+#   3. CloudFront 캐시 무효화
+#   4. GitHub Release 생성
+#
+# ⚠️ Docker 이미지 없음: S3/CloudFront 정적 배포는 Docker 불필요
+#
+# Required Secrets:
+#   AWS_ROLE_ARN_FRONTEND, AWS_S3_BUCKET_PROD, AWS_CLOUDFRONT_DISTRIBUTION_ID_PROD
+# Optional Secrets:
+#   VITE_API_BASE_URL, API_DOMAIN
+# =============================================================================
+
+name: Frontend CI/CD (Prod)
+
+on:
+  push:
+    tags:
+      - "frontend-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy (e.g., 1.0.2). If empty, uses tag name."
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "8"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  # ===========================================================================
+  # Job 1: Build & Deploy to S3
+  # ===========================================================================
+  deploy:
+    name: Build & Deploy to S3
+    runs-on: ubuntu-latest
+    environment: prod
+
+    defaults:
+      run:
+        working-directory: services/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare version info
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # 태그 push인 경우 (frontend-v1.0.0 형식)
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG_NAME#frontend-v}"
+          else
+            # 수동 트리거인 경우
+            VERSION="${{ inputs.version }}"
+          fi
+
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+          echo "📋 Version: ${VERSION}"
+          echo "🔖 Short SHA: ${SHORT_SHA}"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: services/frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build for production
+        run: pnpm build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || '' }}
+
+      - name: Inject runtime config (Production)
+        env:
+          API_DOMAIN_RAW: ${{ secrets.API_DOMAIN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHORT_SHA: ${{ steps.version.outputs.short_sha }}
+        run: |
+          API_DOMAIN=$(echo "$API_DOMAIN_RAW" | tr -d '[:space:]')
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cat > dist/config.js << EOF
+          window.__ENV__ = {
+            API_BASE_URL: "",
+            API_DOMAIN: "${API_DOMAIN}",
+            VERSION: "v${VERSION}",
+            BUILD_SHA: "${SHORT_SHA}",
+            BUILD_TIME: "${BUILD_TIME}",
+            ENVIRONMENT: "prod"
+          };
+          EOF
+
+          echo "📝 Generated config.js (Production):"
+          cat dist/config.js
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_FRONTEND }}
+          aws-region: ap-northeast-2
+
+      - name: Deploy to S3 (versioned folder)
+        env:
+          S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_PROD }}
+          VERSION: v${{ steps.version.outputs.version }}
+        run: |
+          # 버전별 폴더에 배포 (영구 보관 - 롤백용)
+          echo "📦 Deploying to versioned folder: /${VERSION}/"
+          aws s3 sync dist/ "s3://${S3_BUCKET}/${VERSION}/" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # 최신 버전을 루트에 배포 (현재 서빙용)
+          echo "🚀 Deploying to root (current version)"
+          aws s3 sync dist/ "s3://${S3_BUCKET}/" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "config.js" \
+            --exclude "v*/"
+
+          # index.html, config.js는 캐시 없이
+          aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+          aws s3 cp dist/config.js "s3://${S3_BUCKET}/config.js" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID_PROD }} \
+            --paths "/*"
+
+      - name: Production Deployment Summary
+        env:
+          VERSION: v${{ steps.version.outputs.version }}
+          SHORT_SHA: ${{ steps.version.outputs.short_sha }}
+        run: |
+          echo "## 🚀 Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${SHORT_SHA}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **S3 Bucket** | \`${{ secrets.AWS_S3_BUCKET_PROD }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Versioned Path** | \`/${VERSION}/\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔄 Rollback Commands" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# 이전 버전으로 롤백 (예: v1.0.0)" >> $GITHUB_STEP_SUMMARY
+          echo "aws s3 sync s3://\${BUCKET}/v1.0.0/ s3://\${BUCKET}/ --delete" >> $GITHUB_STEP_SUMMARY
+          echo "aws cloudfront create-invalidation --distribution-id \${DIST_ID} --paths '/*'" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Job 2: Create GitHub Release
+  # ===========================================================================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/frontend-v')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Frontend ${{ github.ref_name }}
+          body: |
+            ## Frontend Release ${{ github.ref_name }}
+
+            ### Deployment
+            - **S3 Path:** `/${{ github.ref_name }}/`
+            - **Commit:** `${{ github.sha }}`
+
+            ### Rollback
+            ```bash
+            aws s3 sync s3://${BUCKET}/${{ github.ref_name }}/ s3://${BUCKET}/ --delete
+            aws cloudfront create-invalidation --distribution-id ${DIST_ID} --paths "/*"
+            ```
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
