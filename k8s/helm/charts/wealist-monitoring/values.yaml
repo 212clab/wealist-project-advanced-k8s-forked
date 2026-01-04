@@ -627,7 +627,7 @@ otelCollector:
         # Grafana compatible buckets (in seconds)
         buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
       dimensions:
-        - service.name
+        # Note: service.name is automatically included by spanmetrics connector
         - http.method
         - http.status_code
         - http.route
