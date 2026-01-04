@@ -23,11 +23,10 @@ argo-help: ## [ArgoCD] 도움말 표시
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "빠른 시작:"
-	@echo "  make kind-dev-setup     - Dev 환경 전체 설정 (클러스터+DB+ArgoCD)"
+	@echo "  make kind-dev-setup     - Dev 환경 전체 설정 (클러스터+ArgoCD+DB)"
 	@echo ""
 	@echo "단계별 실행:"
 	@echo "  make cluster-up          - Kind 클러스터 생성"
-	@echo "  make kind-dev-db-up      - DB 컨테이너 시작 (PostgreSQL+Redis)"
 	@echo "  make argo-install-simple - ArgoCD 설치"
 	@echo "  make argo-deploy-dev     - Applications 배포"
 	@echo ""
@@ -36,13 +35,13 @@ argo-help: ## [ArgoCD] 도움말 표시
 	@echo "  make kind-dev-kubeconfig USERNAME=xxx - 팀원용 kubeconfig 생성"
 	@echo ""
 	@echo "상태 확인:"
-	@echo "  make kind-dev-env-status - 클러스터+DB 상태"
+	@echo "  make kind-dev-env-status - 클러스터+내부DB 상태"
 	@echo "  make argo-status         - ArgoCD 상태"
 	@echo ""
 	@echo "관리:"
 	@echo "  make argo-ui          - ArgoCD UI 열기"
-	@echo "  make kind-dev-db-down - DB 컨테이너 중지"
-	@echo "  make kind-dev-clean   - 클러스터 삭제"
+	@echo "  make kind-dev-clean   - 클러스터 삭제 (DB 데이터 보존)"
+	@echo "  make kind-dev-reset   - 클러스터 재생성"
 	@echo ""
 	@echo "ESO (External Secrets):"
 	@echo "  make eso-status       - ESO 상태 확인"
@@ -485,10 +484,10 @@ kind-dev-setup: ## [ArgoCD] Kind 클러스터 + DB 컨테이너 + ArgoCD + 앱 �
 # 리셋 명령어
 # ============================================
 
-# kind-dev-reset: 클러스터 + DB 컨테이너 완전 리셋 (삭제 + 재생성)
+# kind-dev-reset: 클러스터 완전 리셋 (삭제 + 재생성)
 # - Kind 클러스터 삭제 (ArgoCD, Helm, Pod 전부 삭제)
-# - DB 컨테이너 삭제 (데이터는 보존)
-# - 클러스터 + DB + ArgoCD + 앱 전부 새로 생성
+# - DB 데이터는 hostPath에 보존됨 (wealist-project-data/db_data)
+# - 클러스터 + ArgoCD + 앱 전부 새로 생성
 kind-dev-reset: ## [Reset] Dev 환경 완전 리셋 (삭제 후 재생성)
 	@echo -e "$(RED)⚠️  Dev 환경을 완전히 리셋합니다...$(NC)"
 	@echo ""
@@ -498,28 +497,20 @@ kind-dev-reset: ## [Reset] Dev 환경 완전 리셋 (삭제 후 재생성)
 		echo -e "$(YELLOW)1. Kind 클러스터 삭제 중...$(NC)"; \
 		kind delete cluster --name wealist 2>/dev/null || true; \
 		echo ""; \
-		echo -e "$(YELLOW)2. DB 컨테이너 삭제 중...$(NC)"; \
-		docker compose -f docker/dev/docker-compose.dev-db.yaml down 2>/dev/null || true; \
-		docker rm -f postgres-dev redis-dev 2>/dev/null || true; \
-		echo ""; \
-		echo -e "$(YELLOW)3. Dev 환경 재생성 중...$(NC)"; \
+		echo -e "$(YELLOW)2. Dev 환경 재생성 중...$(NC)"; \
 		$(MAKE) kind-dev-setup; \
 	else \
 		echo "리셋 취소됨"; \
 	fi
 
-kind-dev-clean: ## [Reset] Dev 클러스터 + DB 컨테이너 삭제 (재생성 없음)
+kind-dev-clean: ## [Reset] Dev 클러스터 삭제 (재생성 없음)
 	@echo -e "$(RED)🗑️  Dev 환경 삭제 중...$(NC)"
 	@echo ""
 	@echo "Kind 클러스터 삭제..."
 	@kind delete cluster --name wealist 2>/dev/null || echo "클러스터 없음"
 	@echo ""
-	@echo "DB 컨테이너 중지..."
-	@docker compose -f docker/dev/docker-compose.dev-db.yaml down 2>/dev/null || true
-	@docker rm -f postgres-dev redis-dev 2>/dev/null || true
-	@echo ""
 	@echo -e "$(GREEN)✅ Dev 환경 삭제 완료$(NC)"
-	@echo "   데이터는 /home/wealist-oranges/wealist-project-data/db_data에 보존됩니다."
+	@echo "   DB 데이터는 wealist-project-data/db_data에 보존됩니다."
 	@echo ""
 	@echo "재생성: make kind-dev-setup"
 

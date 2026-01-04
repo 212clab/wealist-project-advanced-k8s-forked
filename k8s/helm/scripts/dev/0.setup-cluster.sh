@@ -2,11 +2,12 @@
 # =============================================================================
 # Kind 클러스터 + Istio Ambient 설정 (dev 환경 - wealist-oranges)
 # =============================================================================
-# - PostgreSQL/Redis: Docker 컨테이너 (Kind 외부)
+# - PostgreSQL/Redis: 클러스터 내부 Deployment (hostPath로 데이터 영속화)
 # - Istio Ambient: Service Mesh (sidecar-less)
 # - Gateway API: Kubernetes 표준 (NodePort 30080 → hostPort 9080)
 # - ArgoCD: GitOps 배포
 # - 포트 대역: oranges 전용 9000-9999
+# - 데이터 저장: ${WEALIST_DATA_PATH}/db_data
 
 set -e
 
@@ -91,54 +92,12 @@ echo "   - ECR: ${ECR_REGISTRY}"
 echo ""
 
 # =============================================================================
-# 4. DB 컨테이너 시작 (PostgreSQL + Redis)
+# 4. DB 안내 (클러스터 내부 Deployment로 배포됨)
 # =============================================================================
-echo "🐘 PostgreSQL + Redis 컨테이너 시작 중..."
-
-# Docker Compose 파일 경로 확인
-if [ ! -f "${DOCKER_COMPOSE_DB}" ]; then
-    # 상대 경로로 다시 시도
-    DOCKER_COMPOSE_DB="${SCRIPT_DIR}/../../../../docker/dev/docker-compose.dev-db.yaml"
-fi
-
-if [ -f "${DOCKER_COMPOSE_DB}" ]; then
-    # 기존 컨테이너 정리
-    docker rm -f postgres-dev redis-dev 2>/dev/null || true
-
-    # Kind 네트워크가 없으면 생성 (클러스터 생성 전이므로)
-    docker network create kind 2>/dev/null || true
-
-    # DB 컨테이너 시작
-    cd "$(dirname "${DOCKER_COMPOSE_DB}")"
-    docker compose -f "$(basename "${DOCKER_COMPOSE_DB}")" up -d
-    cd - > /dev/null
-
-    # 헬스체크 대기
-    echo "⏳ PostgreSQL 준비 대기 중..."
-    for i in {1..30}; do
-        if docker exec postgres-dev pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} &>/dev/null; then
-            echo "✅ PostgreSQL 준비 완료"
-            break
-        fi
-        sleep 2
-    done
-
-    echo "⏳ Redis 준비 대기 중..."
-    for i in {1..30}; do
-        if docker exec redis-dev redis-cli ping &>/dev/null; then
-            echo "✅ Redis 준비 완료"
-            break
-        fi
-        sleep 1
-    done
-else
-    echo "⚠️  docker-compose.dev-db.yaml 파일을 찾을 수 없습니다."
-    echo "   DB 컨테이너 없이 진행합니다. 수동으로 설정하세요."
-fi
-
-# DB_HOST 설정 (Docker 브릿지 게이트웨이)
-DB_HOST=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
-echo "📍 DB_HOST 설정: ${DB_HOST}"
+echo "🐘 PostgreSQL + Redis는 클러스터 내부에서 실행됩니다."
+echo "   - 데이터 저장: ${WEALIST_DATA_PATH}/db_data/postgres, redis"
+echo "   - ArgoCD가 wealist-infrastructure 차트를 배포하면 자동 시작됩니다."
+echo ""
 
 # =============================================================================
 # 5. 기존 클러스터 삭제 (있으면)
@@ -370,37 +329,18 @@ fi
 echo "✅ ESO 설정 완료"
 
 # =============================================================================
-# 13. dev.yaml에 DB_HOST 업데이트
+# 13. dev.yaml 업데이트 (AWS Account ID만)
 # =============================================================================
-echo "🔧 dev.yaml에 DB_HOST 업데이트 중..."
+echo "🔧 dev.yaml 설정 확인 중..."
 DEV_YAML="${HELM_DIR}/environments/dev.yaml"
 
-if [ -f "${DEV_YAML}" ]; then
-    sed -i "s/DB_HOST: .*/DB_HOST: \"${DB_HOST}\"/" "${DEV_YAML}"
-    sed -i "s/POSTGRES_HOST: .*/POSTGRES_HOST: \"${DB_HOST}\"/" "${DEV_YAML}"
-    sed -i "s/REDIS_HOST: .*/REDIS_HOST: \"${DB_HOST}\"/" "${DEV_YAML}"
-    sed -i "s/SPRING_REDIS_HOST: .*/SPRING_REDIS_HOST: \"${DB_HOST}\"/" "${DEV_YAML}"
-    echo "✅ dev.yaml 업데이트 완료 (DB_HOST: ${DB_HOST})"
-fi
-
-# ArgoCD Application 파일들에 DB_HOST 업데이트
-ARGOCD_APPS_DIR="${HELM_DIR}/../argocd/apps/dev"
-if [ -d "${ARGOCD_APPS_DIR}" ]; then
-    echo "  → ArgoCD Application 파일들 업데이트 중..."
-    for file in "${ARGOCD_APPS_DIR}"/*-service.yaml; do
-        if [ -f "$file" ]; then
-            sed -i "s|value: \"172.17.0.1\"|value: \"${DB_HOST}\"|g" "$file"
-            sed -i "s|value: \"host.docker.internal\"|value: \"${DB_HOST}\"|g" "$file"
-        fi
-    done
-    echo "✅ ArgoCD Application 파일들 업데이트 완료"
-fi
-
 # AWS Account ID 자동 업데이트
-if grep -q "<AWS_ACCOUNT_ID>" "${DEV_YAML}" 2>/dev/null; then
+if [ -f "${DEV_YAML}" ] && grep -q "<AWS_ACCOUNT_ID>" "${DEV_YAML}" 2>/dev/null; then
     sed -i "s/<AWS_ACCOUNT_ID>/${AWS_ACCOUNT_ID}/g" "${DEV_YAML}"
     echo "✅ dev.yaml: AWS Account ID 업데이트 완료"
 fi
+echo "   DB_HOST: postgres (클러스터 내부 Service)"
+echo "   REDIS_HOST: redis (클러스터 내부 Service)"
 
 # =============================================================================
 # 14. ArgoCD 설치
@@ -493,12 +433,13 @@ echo "=============================================="
 echo "  ✅ wealist-oranges dev 클러스터 준비 완료!"
 echo "=============================================="
 echo ""
-echo "🐘 PostgreSQL: localhost:9432 (컨테이너: postgres-dev)"
-echo "   - User: ${POSTGRES_USER}"
-echo "   - Password: ${POSTGRES_PASSWORD}"
-echo "   - Database: ${POSTGRES_DB}"
+echo "🐘 PostgreSQL: postgres.${NAMESPACE}.svc (클러스터 내부)"
+echo "   - User: postgres"
+echo "   - Database: wealist"
+echo "   - 데이터 저장: ${WEALIST_DATA_PATH}/db_data/postgres"
 echo ""
-echo "📮 Redis: localhost:9379 (컨테이너: redis-dev)"
+echo "📮 Redis: redis.${NAMESPACE}.svc (클러스터 내부)"
+echo "   - 데이터 저장: ${WEALIST_DATA_PATH}/db_data/redis"
 echo ""
 echo "🌐 Istio Gateway: http://localhost:9080"
 echo "📦 Namespace: ${NAMESPACE}"
@@ -519,5 +460,5 @@ echo ""
 echo "📝 상태 확인:"
 echo "   kubectl get pods -n ${NAMESPACE}"
 echo "   kubectl get apps -n argocd"
-echo "   docker ps  # DB 컨테이너 확인"
+echo "   make kind-dev-env-status"
 echo "=============================================="

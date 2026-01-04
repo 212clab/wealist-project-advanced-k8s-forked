@@ -1477,32 +1477,16 @@ init-local-db: ## 로컬 PostgreSQL/Redis 초기화 (Ubuntu, ENV=local-ubuntu)
 	@echo "다음: make helm-install-all ENV=dev"
 
 # =============================================================================
-# Kind-Dev 컨테이너 DB + RBAC (wealist-oranges 환경)
+# Kind-Dev RBAC (wealist-oranges 환경)
 # =============================================================================
+# DB는 클러스터 내부 Deployment로 실행됨 (wealist-infrastructure 차트)
+# 데이터는 hostPath로 ${WEALIST_DATA_PATH}/db_data에 영속화
 
-##@ Kind-Dev DB & RBAC
+##@ Kind-Dev RBAC
 
-.PHONY: kind-dev-db-up kind-dev-db-down kind-dev-rbac kind-dev-kubeconfig kind-dev-env-status
+.PHONY: kind-dev-rbac kind-dev-kubeconfig kind-dev-env-status
 
 KIND_DEV_DATA_PATH ?= /home/wealist-oranges/wealist-project-data
-DOCKER_COMPOSE_DB := docker/dev/docker-compose.dev-db.yaml
-
-kind-dev-db-up: ## 🐘 DB 컨테이너 시작 (PostgreSQL + Redis)
-	@echo "=== DB 컨테이너 시작 ==="
-	@export WEALIST_DATA_PATH="$(KIND_DEV_DATA_PATH)" && \
-		docker network create kind 2>/dev/null || true && \
-		docker compose -f $(DOCKER_COMPOSE_DB) up -d
-	@echo ""
-	@echo "⏳ 헬스체크 대기 중..."
-	@sleep 5
-	@docker exec postgres-dev pg_isready -U wealist -d wealist && echo "✅ PostgreSQL ready" || echo "❌ PostgreSQL not ready"
-	@docker exec redis-dev redis-cli ping && echo "✅ Redis ready" || echo "❌ Redis not ready"
-
-kind-dev-db-down: ## 🐘 DB 컨테이너 중지
-	@echo "=== DB 컨테이너 중지 ==="
-	@docker compose -f $(DOCKER_COMPOSE_DB) down 2>/dev/null || true
-	@docker rm -f postgres-dev redis-dev 2>/dev/null || true
-	@echo "✅ DB 컨테이너 중지 완료"
 
 kind-dev-rbac: ## 🔐 팀원용 RBAC 설정 (wealist-dev 네임스페이스만 접근)
 	@echo "=== 팀원용 RBAC 설정 ==="
@@ -1526,7 +1510,7 @@ kind-dev-kubeconfig: ## 🔑 팀원용 제한된 kubeconfig 생성 (USERNAME=xxx
 	fi
 	@./scripts/create-team-kubeconfig.sh $(USERNAME)
 
-kind-dev-env-status: ## 📊 Kind-Dev 환경 상태 확인 (클러스터 + DB)
+kind-dev-env-status: ## 📊 Kind-Dev 환경 상태 확인 (클러스터 + 내부 DB)
 	@echo "=============================================="
 	@echo "  📊 Kind-Dev 환경 상태"
 	@echo "=============================================="
@@ -1539,18 +1523,20 @@ kind-dev-env-status: ## 📊 Kind-Dev 환경 상태 확인 (클러스터 + DB)
 		echo "   ❌ 클러스터 없음"; \
 	fi
 	@echo ""
-	@echo "🐘 PostgreSQL:"
-	@if docker ps --format '{{.Names}}' | grep -q "postgres-dev"; then \
-		echo "   ✅ postgres-dev 실행 중 (localhost:9432)"; \
+	@echo "🐘 PostgreSQL (클러스터 내부):"
+	@if kubectl get pod -n wealist-dev -l app=postgres -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then \
+		echo "   ✅ postgres 실행 중"; \
+		echo "   데이터: $(KIND_DEV_DATA_PATH)/db_data/postgres"; \
 	else \
-		echo "   ❌ postgres-dev 없음"; \
+		echo "   ❌ postgres 없음 또는 시작 중"; \
 	fi
 	@echo ""
-	@echo "📮 Redis:"
-	@if docker ps --format '{{.Names}}' | grep -q "redis-dev"; then \
-		echo "   ✅ redis-dev 실행 중 (localhost:9379)"; \
+	@echo "📮 Redis (클러스터 내부):"
+	@if kubectl get pod -n wealist-dev -l app=redis -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then \
+		echo "   ✅ redis 실행 중"; \
+		echo "   데이터: $(KIND_DEV_DATA_PATH)/db_data/redis"; \
 	else \
-		echo "   ❌ redis-dev 없음"; \
+		echo "   ❌ redis 없음 또는 시작 중"; \
 	fi
 	@echo ""
 	@echo "🌐 접속 정보:"
