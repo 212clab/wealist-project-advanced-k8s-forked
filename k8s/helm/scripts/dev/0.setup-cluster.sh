@@ -375,6 +375,53 @@ else
 fi
 
 # =============================================================================
+# 14-1. ArgoCD Google OAuth 설정 (환경변수에서 읽음)
+# =============================================================================
+# 환경변수:
+#   GOOGLE_OAUTH_CLIENT_ID - Google OAuth Client ID
+#   GOOGLE_OAUTH_CLIENT_SECRET - Google OAuth Client Secret
+#
+# 설정 방법:
+#   export GOOGLE_OAUTH_CLIENT_ID="xxx.apps.googleusercontent.com"
+#   export GOOGLE_OAUTH_CLIENT_SECRET="GOCSPX-xxx"
+# =============================================================================
+echo ""
+echo "🔐 ArgoCD Google OAuth 설정 확인 중..."
+
+if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -n "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; then
+    echo "  → Google OAuth 환경변수 발견, 설정 적용 중..."
+
+    # Google OAuth Secret 추가
+    kubectl patch secret argocd-secret -n argocd --type merge -p "{
+      \"stringData\": {
+        \"dex.google.clientSecret\": \"${GOOGLE_OAUTH_CLIENT_SECRET}\"
+      }
+    }" 2>/dev/null || true
+
+    # ArgoCD ConfigMap에 Dex config 추가
+    kubectl patch configmap argocd-cm -n argocd --type merge -p "{
+      \"data\": {
+        \"url\": \"https://dev.wealist.co.kr/api/argo\",
+        \"dex.config\": \"connectors:\\n  - type: google\\n    id: google\\n    name: Google\\n    config:\\n      clientID: ${GOOGLE_OAUTH_CLIENT_ID}\\n      clientSecret: \\\$dex.google.clientSecret\\n      redirectURI: https://dev.wealist.co.kr/api/argo/api/dex/callback\"
+      }
+    }"
+
+    # ArgoCD 서버 재시작 (Dex 설정 적용)
+    echo "⏳ ArgoCD 서버 재시작 중 (Google OAuth 적용)..."
+    kubectl rollout restart deployment argocd-server argocd-dex-server -n argocd
+    kubectl rollout status deployment argocd-server -n argocd --timeout=120s
+
+    echo "✅ ArgoCD Google OAuth 설정 완료"
+    echo "   - Google 로그인: https://dev.wealist.co.kr/api/argo"
+else
+    echo "⚠️  Google OAuth 환경변수가 설정되지 않았습니다."
+    echo "   Google 로그인을 사용하려면 다음 환경변수를 설정하세요:"
+    echo "   export GOOGLE_OAUTH_CLIENT_ID=\"your-client-id.apps.googleusercontent.com\""
+    echo "   export GOOGLE_OAUTH_CLIENT_SECRET=\"GOCSPX-xxx\""
+    echo "   그 후 make kind-dev-setup 재실행"
+fi
+
+# =============================================================================
 # 15. ReferenceGrant + HTTPRoute 즉시 적용 (ArgoCD 접근용)
 # =============================================================================
 echo ""
@@ -451,11 +498,9 @@ echo "   - Prometheus: http://localhost:9080/api/monitoring/prometheus"
 echo "   - Kiali:      http://localhost:9080/api/monitoring/kiali"
 echo ""
 echo "🔧 ArgoCD:"
-echo "   - URL: http://localhost:9080/api/argo"
-echo "   - Username: admin"
-if [ -n "$ARGOCD_PASSWORD" ]; then
-    echo "   - Password: ${ARGOCD_PASSWORD}"
-fi
+echo "   - URL: https://dev.wealist.co.kr/api/argo"
+echo "   - Google 로그인: LOG IN VIA GOOGLE 버튼"
+echo "   - 또는 admin / ${ARGOCD_PASSWORD:-<변경됨>}"
 echo ""
 echo "📝 상태 확인:"
 echo "   kubectl get pods -n ${NAMESPACE}"
