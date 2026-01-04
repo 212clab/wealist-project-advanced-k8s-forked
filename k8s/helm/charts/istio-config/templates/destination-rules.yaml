@@ -11,7 +11,7 @@ metadata:
 spec:
   host: {{ .name }}
   trafficPolicy:
-    {{- /* Ambient 모드에서는 ztunnel이 mTLS 처리, DestinationRule에서 설정 불필요 */}}
+    {{- /* Sidecar 모드에서는 mTLS 명시적 설정 필요, Ambient는 ztunnel이 자동 처리 */}}
     {{- if and $.Values.istio.mtls.enabled (not $.Values.istio.ambient.enabled) }}
     tls:
       mode: ISTIO_MUTUAL
@@ -47,5 +47,15 @@ spec:
       {{- if $.Values.istio.destinationRules.outlierDetection.minHealthPercent }}
       minHealthPercent: {{ $.Values.istio.destinationRules.outlierDetection.minHealthPercent }}
       {{- end }}
+  {{- /* Canary deployment subsets for VirtualService weight-based routing */}}
+  {{- if and $.Values.virtualService.enabled $.Values.virtualService.canary.enabled }}
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+  - name: canary
+    labels:
+      version: canary
+  {{- end }}
 {{- end }}
 {{- end }}

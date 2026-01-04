@@ -48,6 +48,33 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
 
 # -----------------------------------------------------------------------------
+# Argo Rollouts (Progressive Delivery)
+# -----------------------------------------------------------------------------
+# Enable rollout to use Argo Rollouts instead of Deployment
+# When enabled, the service will use canary deployment strategy
+rollout:
+  enabled: false  # Disabled by default, enable per-service in prod
+  revisionHistoryLimit: 3
+  maxUnavailable: 0
+  maxSurge: "25%"
+  canary:
+    steps:
+      - setWeight: 10
+      - pause: { duration: 2m }
+      - setWeight: 30
+      - pause: { duration: 2m }
+      - setWeight: 50
+      - pause: { duration: 2m }
+  analysis:
+    enabled: false  # Enable for automated rollback based on metrics
+    startingStep: 1
+    count: 5
+    successThreshold: 0.95
+    latencyThresholdMs: 500
+    failureLimit: 3
+    prometheusAddress: "http://prometheus:9090"
+
+# -----------------------------------------------------------------------------
 # Security Context Defaults (production-ready)
 # -----------------------------------------------------------------------------
 podSecurityContext:
