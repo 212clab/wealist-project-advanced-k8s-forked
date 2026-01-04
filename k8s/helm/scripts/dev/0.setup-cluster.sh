@@ -375,6 +375,82 @@ else
 fi
 
 # =============================================================================
+# 14-1. ArgoCD Google OAuth 설정
+# =============================================================================
+# 우선순위:
+#   1. 환경변수 (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET)
+#   2. AWS Secrets Manager (wealist/dev/oauth/argocd)
+#   3. CLI 입력
+# =============================================================================
+echo ""
+echo "🔐 ArgoCD Google OAuth 설정 중..."
+
+OAUTH_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-}"
+OAUTH_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
+
+# 환경변수 없으면 AWS Secrets Manager에서 시도
+if [ -z "$OAUTH_CLIENT_ID" ] || [ -z "$OAUTH_CLIENT_SECRET" ]; then
+    echo "  → 환경변수 없음, AWS Secrets Manager에서 조회 중..."
+
+    # AWS Secrets Manager에서 가져오기 시도
+    OAUTH_SECRET=$(aws secretsmanager get-secret-value \
+        --secret-id "wealist/dev/oauth/argocd" \
+        --region ${AWS_REGION} \
+        --query SecretString \
+        --output text 2>/dev/null || echo "")
+
+    if [ -n "$OAUTH_SECRET" ]; then
+        OAUTH_CLIENT_ID=$(echo "$OAUTH_SECRET" | jq -r '.client_id // empty' 2>/dev/null)
+        OAUTH_CLIENT_SECRET=$(echo "$OAUTH_SECRET" | jq -r '.client_secret // empty' 2>/dev/null)
+        if [ -n "$OAUTH_CLIENT_ID" ] && [ -n "$OAUTH_CLIENT_SECRET" ]; then
+            echo "  ✅ AWS Secrets Manager에서 OAuth 자격증명 로드 완료"
+        fi
+    fi
+fi
+
+# 여전히 없으면 CLI 입력
+if [ -z "$OAUTH_CLIENT_ID" ] || [ -z "$OAUTH_CLIENT_SECRET" ]; then
+    echo ""
+    echo "  Google OAuth 설정이 필요합니다."
+    echo "  (Google Cloud Console → API 및 서비스 → 사용자 인증 정보)"
+    echo ""
+    read -p "  Google OAuth Client ID (Enter 건너뛰기): " OAUTH_CLIENT_ID
+    if [ -n "$OAUTH_CLIENT_ID" ]; then
+        read -p "  Google OAuth Client Secret: " OAUTH_CLIENT_SECRET
+    fi
+fi
+
+# OAuth 설정 적용
+if [ -n "$OAUTH_CLIENT_ID" ] && [ -n "$OAUTH_CLIENT_SECRET" ]; then
+    echo "  → Google OAuth 설정 적용 중..."
+
+    # Google OAuth Secret 추가
+    kubectl patch secret argocd-secret -n argocd --type merge -p "{
+      \"stringData\": {
+        \"dex.google.clientSecret\": \"${OAUTH_CLIENT_SECRET}\"
+      }
+    }" 2>/dev/null || true
+
+    # ArgoCD ConfigMap에 Dex config 추가
+    kubectl patch configmap argocd-cm -n argocd --type merge -p "{
+      \"data\": {
+        \"url\": \"https://dev.wealist.co.kr/api/argo\",
+        \"dex.config\": \"connectors:\\n  - type: google\\n    id: google\\n    name: Google\\n    config:\\n      clientID: ${OAUTH_CLIENT_ID}\\n      clientSecret: \\\$dex.google.clientSecret\\n      redirectURI: https://dev.wealist.co.kr/api/argo/api/dex/callback\"
+      }
+    }"
+
+    # ArgoCD 서버 재시작 (Dex 설정 적용)
+    echo "⏳ ArgoCD 서버 재시작 중 (Google OAuth 적용)..."
+    kubectl rollout restart deployment argocd-server argocd-dex-server -n argocd
+    kubectl rollout status deployment argocd-server -n argocd --timeout=120s
+
+    echo "✅ ArgoCD Google OAuth 설정 완료"
+    echo "   - Google 로그인: https://dev.wealist.co.kr/api/argo"
+else
+    echo "⚠️  Google OAuth 설정 건너뜀 (admin 계정으로 로그인)"
+fi
+
+# =============================================================================
 # 15. ReferenceGrant + HTTPRoute 즉시 적용 (ArgoCD 접근용)
 # =============================================================================
 echo ""
@@ -451,11 +527,9 @@ echo "   - Prometheus: http://localhost:9080/api/monitoring/prometheus"
 echo "   - Kiali:      http://localhost:9080/api/monitoring/kiali"
 echo ""
 echo "🔧 ArgoCD:"
-echo "   - URL: http://localhost:9080/api/argo"
-echo "   - Username: admin"
-if [ -n "$ARGOCD_PASSWORD" ]; then
-    echo "   - Password: ${ARGOCD_PASSWORD}"
-fi
+echo "   - URL: https://dev.wealist.co.kr/api/argo"
+echo "   - Google 로그인: LOG IN VIA GOOGLE 버튼"
+echo "   - 또는 admin / ${ARGOCD_PASSWORD:-<변경됨>}"
 echo ""
 echo "📝 상태 확인:"
 echo "   kubectl get pods -n ${NAMESPACE}"
