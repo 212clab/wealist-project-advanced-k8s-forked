@@ -54,6 +54,42 @@ mkdir -p "${WEALIST_DATA_PATH}/loki"
 echo "✅ 데이터 디렉토리 생성 완료: ${WEALIST_DATA_PATH}"
 
 # =============================================================================
+# 1-1. Prometheus/Grafana/Loki 권한 설정 (hostPath 사용 시 필수)
+# =============================================================================
+# Prometheus: UID 65534 (nobody), Grafana: UID 472, Loki: UID 10001
+echo ""
+echo "🔐 모니터링 디렉토리 권한 설정이 필요합니다."
+echo "   - Prometheus: UID 65534 (nobody)"
+echo "   - Grafana: UID 472"
+echo "   - Loki: UID 10001"
+echo ""
+read -p "sudo로 권한을 설정할까요? (Y/n): " SETUP_PERMS
+SETUP_PERMS=${SETUP_PERMS:-Y}
+
+if [[ "$SETUP_PERMS" =~ ^[Yy]$ ]]; then
+    echo "⏳ 모니터링 디렉토리 권한 설정 중..."
+
+    # Prometheus (UID 65534)
+    sudo chown -R 65534:65534 "${WEALIST_DATA_PATH}/prometheus"
+    sudo chmod 770 "${WEALIST_DATA_PATH}/prometheus"
+
+    # Grafana (UID 472)
+    sudo chown -R 472:472 "${WEALIST_DATA_PATH}/grafana"
+    sudo chmod 770 "${WEALIST_DATA_PATH}/grafana"
+
+    # Loki (UID 10001)
+    sudo chown -R 10001:10001 "${WEALIST_DATA_PATH}/loki"
+    sudo chmod 770 "${WEALIST_DATA_PATH}/loki"
+
+    echo "✅ 모니터링 디렉토리 권한 설정 완료"
+else
+    echo "⚠️  권한 설정 건너뜀. 나중에 수동으로 설정하세요:"
+    echo "   sudo chown -R 65534:65534 ${WEALIST_DATA_PATH}/prometheus"
+    echo "   sudo chown -R 472:472 ${WEALIST_DATA_PATH}/grafana"
+    echo "   sudo chown -R 10001:10001 ${WEALIST_DATA_PATH}/loki"
+fi
+
+# =============================================================================
 # 2. Kind 설정 파일 렌더링 (환경변수 치환)
 # =============================================================================
 echo "📝 Kind 설정 파일 렌더링 중..."
