@@ -47,10 +47,10 @@ securityContext:
 # -----------------------------------------------------------------------------
 # External Secrets Operator (ESO)
 # -----------------------------------------------------------------------------
-# ESO가 AWS Secrets Manager에서 wealist-shared-secret을 자동 생성
-# Helm chart에서 secret 생성을 건너뜀
+# Dev 환경: ESO 비활성화 (Kind 클러스터 내부 DB 사용)
+# Prod 환경: ESO가 AWS Secrets Manager에서 wealist-shared-secret을 자동 생성
 externalSecrets:
-  enabled: true
+  enabled: false
 
 # -----------------------------------------------------------------------------
 # Features
@@ -84,7 +84,6 @@ shared:
     CHAT_SERVICE_URL: "http://chat-service:8001"
     NOTI_SERVICE_URL: "http://noti-service:8002"
     STORAGE_SERVICE_URL: "http://storage-service:8003"
-    VIDEO_SERVICE_URL: "http://video-service:8004"
     LIVEKIT_WS_URL: "wss://dev.wealist.co.kr/api/svc/livekit"
 
     # Infrastructure Ports
@@ -115,10 +114,35 @@ shared:
     # Internal API Key (dev용)
     INTERNAL_API_KEY: "dev-internal-key-2024"
 
-    # OTEL Configuration (base.yaml 상속, 환경별 오버라이드만)
-    # Protocol: HTTP/protobuf (http://otel-collector:4318) - base.yaml에서 정의
-    OTEL_TRACES_SAMPLER_ARG: "0.5"  # dev: 50% 샘플링
+    # OTEL Configuration
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+    OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
+    OTEL_TRACES_SAMPLER_ARG: "0.5"
+    OTEL_PROPAGATORS: "tracecontext,baggage"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
+
+  # Shared Secrets (dev 환경용 - 프로덕션은 ExternalSecrets 사용)
+  secrets:
+    # Database
+    DB_HOST: "postgres"
+    DB_PORT: "5432"
+    DB_USER: "wealist"
+    DB_USERNAME: "wealist"
+    DB_PASSWORD: "wealist-dev-password"
+    DATABASE_URL: "postgresql://wealist:wealist-dev-password@postgres:5432/wealist?sslmode=disable"
+    POSTGRES_HOST: "postgres"
+    # Redis
+    REDIS_HOST: "redis"
+    REDIS_PASSWORD: ""
+    SPRING_REDIS_HOST: "redis"
+    SPRING_REDIS_PASSWORD: ""
+    # Auth
+    JWT_SECRET: "dev-jwt-secret-key-2024-wealist"
+    INTERNAL_API_KEY: "dev-internal-key-2024"
+    # S3/MinIO
+    S3_ACCESS_KEY: "minioadmin"
+    S3_SECRET_KEY: "minioadmin"
 
 # -----------------------------------------------------------------------------
 # Ingress (Disabled - Istio Gateway)
@@ -190,43 +214,21 @@ istio:
   enabled: true
   namespace: wealist-dev
 
-  gateway:
-    enabled: false
-    name: wealist-gateway
-    hosts:
-      - "dev.wealist.co.kr"
-      - "api.dev.wealist.co.kr"
-      - "*"
-    tls:
-      enabled: false
-
-  httpRoute:
-    enabled: false  # Disabled for Sidecar mode (using VirtualService instead)
-    gatewayRef:
-      name: istio-ingressgateway
-      namespace: istio-system
-    hosts:
-      - "dev.wealist.co.kr"
-      - "api.dev.wealist.co.kr"
-      - "localhost"
-      - "*"  # Kind 로컬 접근용
-
-  # VirtualService 설정 (Sidecar mode에서 활성화)
+  # VirtualService 활성화 (Istio Gateway + VirtualService 방식)
+  # NOTE: hosts에 "*"와 specific host를 함께 사용하면 Istio validation error 발생
   virtualService:
     enabled: true
     hosts:
-      - "dev.wealist.co.kr"
-      - "api.dev.wealist.co.kr"
-      - "localhost"
       - "*"
-    canary:
-      enabled: false
+    # Frontend (S3/CloudFront에서 서빙하므로 비활성화)
     frontend:
       enabled: false
+    # MinIO 라우팅
     minio:
       enabled: true
       host: minio
       port: 9000
+    # 모니터링 라우팅
     monitoring:
       enabled: true
       grafana:
@@ -254,6 +256,25 @@ istio:
     # Ops Portal (dev에서는 비활성화)
     opsPortal:
       enabled: false
+
+  # Istio Gateway (networking.istio.io) 활성화
+  # NOTE: hosts에 "*"와 specific host를 함께 사용하면 Istio validation error 발생
+  gateway:
+    enabled: true
+    name: istio-ingressgateway
+    namespace: istio-system
+    hosts:
+      - "*"
+    tls:
+      enabled: false
+
+  # Kubernetes Gateway API - 비활성화 (VirtualService 사용)
+  k8sGateway:
+    enabled: false
+
+  # HTTPRoute 비활성화 (VirtualService 사용)
+  httpRoute:
+    enabled: false
 
   mtls:
     enabled: true
@@ -306,16 +327,12 @@ istio:
   jwtAuth:
     enabled: false
 
-  # Sidecar Mode Configuration (2025 Best Practice)
-  sidecar:
-    enabled: true
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
+  # Ambient 모드 비활성화 (Sidecar 모드 사용)
+  ambient:
+    enabled: false
+    waypoint:
+      enabled: false
+      name: wealist-waypoint
 
   telemetry:
     tracing:
@@ -372,6 +389,14 @@ grafana:
     allowSignUp: false
     rootUrl: "https://dev.wealist.co.kr/api/monitoring/grafana"
     serveFromSubPath: "true"
+  # Google OAuth - ArgoCD와 동일한 OAuth 앱 사용
+  oauth:
+    google:
+      enabled: true
+      autoLogin: false  # 기본 로그인 폼도 표시 (admin 계정 접근용)
+      # 관리자 이메일 → Admin 역할 자동 부여
+      # JMESPath 표현식: 이메일이 목록에 있으면 Admin, 아니면 Viewer
+      roleAttributePath: "contains(['chamchi0129@gmail.com','ressk4149@gmail.com','fbaudwo144@gmail.com','212clab@gmail.com'], email) && 'Admin' || 'Viewer'"
 
 monitoringIngress:
   enabled: false
