@@ -215,13 +215,16 @@ istio:
   enabled: true
   namespace: wealist-dev
 
+  # VirtualService 비활성화 (Gateway API HTTPRoute 사용)
+  virtualService:
+    enabled: false
+
   gateway:
     enabled: false
     name: wealist-gateway
     hosts:
       - "dev.wealist.co.kr"
       - "api.dev.wealist.co.kr"
-      - "*"
     tls:
       enabled: false
 
