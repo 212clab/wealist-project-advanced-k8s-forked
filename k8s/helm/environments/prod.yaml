@@ -6,6 +6,11 @@
 # Namespace: wealist-prod
 
 # -----------------------------------------------------------------------------
+# Chart Enable Flag (for istio-config templates)
+# -----------------------------------------------------------------------------
+enabled: true
+
+# -----------------------------------------------------------------------------
 # Global Settings
 # -----------------------------------------------------------------------------
 global:
@@ -237,6 +242,13 @@ istio:
   enabled: true
   namespace: wealist-prod
 
+  # EnvoyFilter for X-Forwarded-Proto header
+  # NLB terminates TLS and forwards HTTP to Istio
+  # This filter adds X-Forwarded-Proto: https so backend services know original was HTTPS
+  envoyFilter:
+    forwardedProto:
+      enabled: true
+
   # Istio Gateway (VirtualService용)
   # istio-ingressgateway ArgoCD Application에서 Deployment/Service 생성
   # 이 Gateway 리소스는 VirtualService의 진입점으로 사용됨
@@ -280,8 +292,9 @@ istio:
       - "wealist.co.kr"
       - "api.wealist.co.kr"
       - "livekit.wealist.co.kr"
+      - "argocd.wealist.co.kr"
     canary:
-      enabled: false
+      enabled: true  # Enable for Argo Rollouts canary deployment
       stableWeight: 100
       canaryWeight: 0
     frontend:
@@ -339,6 +352,15 @@ istio:
       disableMtls: false
     redis:
       disableMtls: false
+
+  # 서비스 목록 (DestinationRule 생성용)
+  services:
+    - name: auth-service
+    - name: user-service
+    - name: board-service
+    - name: chat-service
+    - name: noti-service
+    - name: storage-service
 
   # 트래픽 제어 - Circuit Breaker, Connection Pool
   destinationRules:
@@ -486,6 +508,9 @@ grafana:
     allowSignUp: false
     rootUrl: "https://api.wealist.co.kr/api/monitoring/grafana"
     serveFromSubPath: "true"
+  # V3 Dashboards - OTEL Native Monitoring
+  dashboardsV3:
+    enabled: true
 
 # 모니터링 Ingress
 monitoringIngress:
