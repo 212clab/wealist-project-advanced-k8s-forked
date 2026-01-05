@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ChevronLeft, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useChatWebSocket } from '../../hooks/useChatWebsocket';
-import { getMessages, updateLastRead, getChat } from '../../api/chatService';
+import { getMessages, updateLastRead, getChat, generateChatPresignedURL, uploadChatFileToS3 } from '../../api/chatService';
 import { getWorkspaceMembers } from '../../api/userService';
-import { generateUploadURL, uploadFileToS3 } from '../../api/storageService';
 import type { Message } from '../../types/chat';
 import type { WorkspaceMemberResponse } from '../../types/user';
 
@@ -176,16 +175,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
 
     setIsUploading(true);
     try {
-      // 🔥 storage-service를 통해 S3 업로드 URL 생성
-      const uploadUrlResponse = await generateUploadURL({
+      // 🔥 chat-service를 통해 S3 업로드 URL 생성
+      const uploadUrlResponse = await generateChatPresignedURL({
         workspaceId,
         fileName: pastedImage.name,
         contentType: pastedImage.type,
         fileSize: pastedImage.size,
       });
 
-      // 🔥 S3에 직접 업로드 (storage-service의 uploadFileToS3 사용)
-      await uploadFileToS3(uploadUrlResponse.uploadUrl, pastedImage);
+      // 🔥 S3에 직접 업로드 (chat-service의 uploadChatFileToS3 사용)
+      await uploadChatFileToS3(uploadUrlResponse.uploadUrl, pastedImage);
 
       // 🔥 S3 URL 구성 (fileKey 사용)
       const fileUrl = `https://s3.ap-northeast-2.amazonaws.com/wealist-app-resources/${uploadUrlResponse.fileKey}`;
