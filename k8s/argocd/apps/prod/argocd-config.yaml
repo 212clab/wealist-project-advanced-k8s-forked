@@ -1,17 +1,20 @@
 # =============================================================================
-# ArgoCD Self-Configuration (Notifications, Health Checks, etc.)
+# ArgoCD Self-Configuration (App of Apps, Notifications, Health Checks, etc.)
 # =============================================================================
 # ArgoCD 자체 설정을 GitOps로 관리
+# - apps/prod/: 서비스별 Application 매니페스트 (App of Apps)
 # - config/: ArgoCD ConfigMap (health check 등)
 # - notifications/: 알림 설정
 # - kyverno/: 정책 설정
 # - projects/: AppProject 설정
 #
 # 이 Application이 없으면:
+# - CI가 Application manifest 업데이트해도 클러스터에 자동 적용 안 됨
 # - terraform destroy + apply 후 설정이 사라짐
 # - 수동으로 kubectl apply 해야 함
 #
 # 이 Application이 있으면:
+# - CI가 image tag 업데이트하면 Application manifest 자동 적용
 # - Git에서 설정 변경 시 자동 적용
 # - terraform 재배포해도 자동 복구
 #
@@ -31,6 +34,10 @@ metadata:
 spec:
   project: wealist-prod
   sources:
+    # App of Apps: 서비스별 Application 매니페스트 자동 적용
+    - repoURL: https://github.com/OrangesCloud/wealist-project-advanced-k8s.git
+      targetRevision: k8s-deploy-prod
+      path: k8s/argocd/apps/prod
     # Health check + SSO ConfigMap 설정 (가장 중요)
     - repoURL: https://github.com/OrangesCloud/wealist-project-advanced-k8s.git
       targetRevision: k8s-deploy-prod
