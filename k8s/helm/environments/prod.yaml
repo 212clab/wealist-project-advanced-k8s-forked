@@ -542,6 +542,28 @@ k6:
   prometheus:
     # routePrefix 포함 필수 (/api/monitoring/prometheus)
     remoteWriteUrl: "http://prometheus:9090/api/monitoring/prometheus/api/v1/write"
+  # Production 환경 라우트: /api/svc/{service} (Kind는 /svc/{service})
+  endpoints:
+    baseUrl: "http://istio-ingressgateway.istio-system.svc.cluster.local"
+    services:
+      - name: board
+        path: /api/svc/board
+        healthPath: /health/live
+      - name: user
+        path: /api/svc/user
+        healthPath: /health/live
+      - name: chat
+        path: /api/svc/chat
+        healthPath: /health/live
+      - name: noti
+        path: /api/svc/noti
+        healthPath: /health/live
+      - name: storage
+        path: /api/svc/storage
+        healthPath: /health/live
+      - name: auth
+        path: /api/svc/auth
+        healthPath: /actuator/health
 
 # Pushgateway (GitHub Actions CI/CD 메트릭 수집용)
 pushgateway:
