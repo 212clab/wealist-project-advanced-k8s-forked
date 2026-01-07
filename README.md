@@ -134,26 +134,26 @@ make dev-up
 - [x] K8s manifest 정리
 - [x] Kind 로컬 배포 테스트
 - [x] Helm 차트 전환
-- [ ] ArgoCD 로컬 설치 + GitOps 테스트
+- [x] ArgoCD 로컬 설치 + GitOps 테스트
 
 ### Phase 2: 모니터링/로깅
 
-- [ ] Prometheus + Grafana 설치
-- [ ] Loki 로그 수집
-- [ ] Pod 리소스 튜닝
+- [x] Prometheus + Grafana 설치
+- [x] Loki 로그 수집
+- [x] Pod 리소스 튜닝
 
 ### Phase 3: 서비스 메시 + 고급 배포
 
-- [ ] Istio 설치
-- [ ] mTLS 설정
-- [ ] Argo Rollouts 카나리 배포
+- [x] Istio 설치
+- [x] mTLS 설정
+- [x] Argo Rollouts 카나리 배포
 
 ### Phase 4: AWS 인프라
 
-- [ ] Terraform EKS 클러스터
-- [ ] Cluster Autoscaler
-- [ ] ALB Ingress Controller
-- [ ] 부하 테스트 (k6)
+- [x] Terraform EKS 클러스터
+- [x] Cluster Autoscaler
+- [x] ALB Ingress Controller
+- [x] 부하 테스트 (k6)
 
 ---
 
